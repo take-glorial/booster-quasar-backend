@@ -1,0 +1,554 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+* 게시판 관련
+*
+* @filename mappers/cfn/BoardManagementMapper.xml
+* @author takeit
+* @since 2019.08.02
+* @version 1.0
+* @see
+*
+* << 변경 이력(Modification Information) >>
+*
+* 변경번호 : #1
+* 변경일자 : 2019.08.02
+* 변경사람 : takeit
+* 변경내용 : 신규 생성
+ -->
+<mapper namespace="BoardManagement">
+
+	<resultMap type="kr.co.takeit.util.TakeMap" id="boardMap">
+        <result column="BOARD_TXT" property="BOARD_TXT" jdbcType="CLOB" javaType="string" />
+    </resultMap>
+
+	<!-- board_info(게시판) START -->
+	<select id="boardInfoList" parameterType="map" timeout="0" resultType="kr.co.takeit.util.TakeMap" useCache="false">
+		<![CDATA[
+		/*
+		 * BoardManagement.boardInfoList
+		 * 게시판 목록
+		 * @author takeit
+		 * @since 2019.08.02
+		 */
+		]]>
+		SELECT
+			B.PROJECT_CD			-- 프로젝트코드
+			, B.MENU_CD				-- 메뉴코드
+			, B.BOARD_SEQ			-- 게시판일련번호
+			, B.BOARD_TITLE			-- 게시판제목
+			, NVL(B.IMPORT_YN, 'N') AS IMPORT_YN			-- 중요여부
+			, B.POPUP_YN			-- 팝업여부
+			, B.POPUP_START_DT		-- 팝업시작일자
+			, B.POPUP_END_DT		-- 팝업종료일자
+			, TO_CHAR(B.REG_DT, 'YYYY-MM-DD HH24:MI') AS REG_DT	-- 등록일시
+			, B.REG_CD				-- 등록자코드
+			, B.BOARD_ATTACH		-- 첨부파일 키
+			, U.USER_NM AS REG_NM	-- 등록자명
+			--, D.DEPT_NM				-- 부서명
+			, (
+				SELECT NVL(SUM( TO_NUMBER(READ_CNT) ), '0') FROM BOARD_READUSER XX
+				WHERE XX.PROJECT_CD = B.PROJECT_CD
+					AND XX.MENU_CD = B.MENU_CD
+					AND XX.BOARD_SEQ = B.BOARD_SEQ
+			  ) AS READ_CNT			-- 조회수
+			, (
+				SELECT COUNT(*) FROM BOARD_REPLY XX
+				WHERE XX.PROJECT_CD = B.PROJECT_CD
+					AND XX.MENU_CD = B.MENU_CD
+					AND XX.BOARD_SEQ = B.BOARD_SEQ
+			  ) AS REPLY_CNT		-- 댓글수
+			, (
+				SELECT COUNT(*) FROM ATTACH_FILE XX
+				WHERE XX.ATTACH_CD = B.BOARD_ATTACH AND DELETE_YN != 'Y'
+			  ) AS ATTACH_CNT		-- 파일수
+            , (CASE WHEN TRUNC(SYSDATE - B.REG_DT) <![CDATA[ <= ]]> 5 THEN 'Y' ELSE 'N' END) AS NEW_YN
+		FROM BOARD_INFO B
+			LEFT JOIN USER_INFO U ON B.REG_CD = U.USER_CD
+			--INNER JOIN DEPT_INFO D ON U.DEPT_CD = D.DEPT_CD
+		WHERE B.PROJECT_CD = #{project_cd}
+			AND B.MENU_CD = #{menu_cd}
+		<if test="@kr.co.takeit.util.MybatisUtil@notEmpty( board_title )">
+			AND B.BOARD_TITLE LIKE ('%' || #{board_title} || '%')
+		</if>
+		<if test="@kr.co.takeit.util.MybatisUtil@notEmpty( reg_cd )">
+			AND U.USER_NM LIKE ('%' || #{reg_cd} || '%')
+		</if>
+		<if test="@kr.co.takeit.util.MybatisUtil@notEmpty( reg_dt_from )">
+			AND TO_DATE(TO_CHAR(B.REG_DT, 'YYYYMMDD'), 'YYYYMMDD') <![CDATA[ >= ]]> TO_DATE(#{reg_dt_from}, 'YYYYMMDD')
+		</if>
+		<if test="@kr.co.takeit.util.MybatisUtil@notEmpty( reg_dt_to )">
+			AND TO_DATE(TO_CHAR(B.REG_DT, 'YYYYMMDD'), 'YYYYMMDD') <![CDATA[ <= ]]> TO_DATE(#{reg_dt_to}, 'YYYYMMDD')
+		</if>
+
+		ORDER BY NVL(B.IMPORT_YN, 'N') DESC, B.REG_DT DESC
+	</select>
+
+	<select id="boardInfoDetail" parameterType="map" timeout="0" resultMap="boardMap" useCache="false">
+		<![CDATA[
+		/*
+		 * BoardManagement.boardInfoDetail
+		 * 게시판 상세
+		 * @author takeit
+		 * @since 2019.08.02
+		 */
+		]]>
+		SELECT
+			PROJECT_CD			-- 프로젝트코드
+			, MENU_CD			-- 메뉴코드
+			, BOARD_SEQ			-- 게시판일련번호
+			, BOARD_TITLE		-- 게시판제목
+			, BOARD_TXT			-- 게시판내용
+			, IMPORT_YN			-- 중요여부
+			, POPUP_YN			-- 팝업여부
+			, POPUP_START_DT	-- 팝업시작일자
+			, POPUP_END_DT		-- 팝업종료일자
+			, BOARD_ATTACH		-- 게시판첨부파일
+			, TO_CHAR(REG_DT, 'YYYY-MM-DD HH24:MI') AS REG_DT	-- 등록일시
+			, REG_CD			-- 등록자코드
+			, TO_CHAR(MOD_DT, 'YYYY-MM-DD HH24:MI') AS MOD_DT	-- 수정일시
+			, MOD_CD			-- 수정자코드
+		FROM BOARD_INFO
+		WHERE PROJECT_CD = #{project_cd}
+			AND MENU_CD = #{menu_cd}
+		  <if test="@kr.co.takeit.util.MybatisUtil@notEmpty( board_seq )">
+				AND BOARD_SEQ = #{board_seq}
+			</if>
+<!--           <if test="@kr.co.takeit.util.MybatisUtil@notEmpty( popup_yn )">
+            <if test ='popup_yn =  "Y"'>
+            AND POPUP_YN = #{popup_yn}
+            AND TO_CHAR(SYSDATE, 'YYYYMMDD') BETWEEN POPUP_START_DT AND POPUP_END_DT
+            </if>
+          </if> -->
+	</select>
+
+	<insert id="boardInfoInsert" parameterType="map" timeout="0">
+		<![CDATA[
+		/*
+		 *
+		 * BoardManagement.boardInfoInsert
+		 * 게시판 입력
+		 * @author takeit
+		 * @since 2019.08.02
+		 */
+		]]>
+		<selectKey keyProperty="BOARD_SEQ" resultType="String" order="BEFORE">
+			SELECT (LPAD(TO_NUMBER(NVL(MAX(BOARD_SEQ), '0') + 1 ), 10, '0')) AS BOARD_SEQ
+			FROM BOARD_INFO
+			WHERE PROJECT_CD = #{project_cd}
+				AND MENU_CD = #{menu_cd}
+		</selectKey>
+		INSERT INTO BOARD_INFO (
+			PROJECT_CD
+			, MENU_CD
+			, BOARD_SEQ
+			, BOARD_TITLE
+			, BOARD_TXT
+			, IMPORT_YN
+			, POPUP_YN
+			, POPUP_START_DT
+			, POPUP_END_DT
+			, BOARD_ATTACH
+			, REG_DT
+			, REG_CD
+		)
+		VALUES (
+			#{project_cd}			-- 프로젝트코드
+			, #{menu_cd}			-- 메뉴코드
+			, #{board_seq}			-- 게시판일련번호
+			, #{board_title}		-- 게시판제목
+            , #{board_txt,jdbcType=CLOB}  -- 게시판내용
+			, #{import_yn}			-- 중요여부
+			, #{popup_yn}			-- 팝업여부
+			, #{popup_start_dt}		-- 팝업시작일자
+			, #{popup_end_dt}		-- 팝업종료일자
+			, #{board_attach}		-- 게시판첨부파일
+			, SYSDATE					-- 등록일시
+			, #{_sessionUserCd}		-- 등록자코드
+		)
+	</insert>
+
+	<update id="boardInfoUpdate" parameterType="map" timeout="0">
+		<![CDATA[
+		/*
+		 *
+		 * BoardManagement.boardInfoUpdate
+		 * 게시판 수정
+		 * @author takeit
+		 * @since 2019.08.02
+		 */
+		]]>
+		UPDATE BOARD_INFO
+		SET
+			MOD_DT = SYSDATE					-- 수정일시
+			, MOD_CD = #{_sessionUserCd}		-- 수정자코드
+			<if test="@kr.co.takeit.util.MybatisUtil@notEmpty( board_title )">
+			, BOARD_TITLE = #{board_title}			-- 게시판제목
+			</if>
+			<if test="@kr.co.takeit.util.MybatisUtil@notEmpty( board_txt )">
+			, BOARD_TXT = #{board_txt,jdbcType=CLOB}  -- 게시판내용
+			</if>
+			<if test="@kr.co.takeit.util.MybatisUtil@notEmpty( import_yn )">
+			, IMPORT_YN = #{import_yn}				-- 중요여부
+			</if>
+			<if test="@kr.co.takeit.util.MybatisUtil@notEmpty( popup_yn )">
+			, POPUP_YN = #{popup_yn}				-- 팝업여부
+			</if>
+			<if test="@kr.co.takeit.util.MybatisUtil@notEmpty( popup_start_dt )">
+			, POPUP_START_DT = #{popup_start_dt}	-- 팝업시작일자
+			</if>
+			<if test="@kr.co.takeit.util.MybatisUtil@notEmpty( popup_end_dt )">
+			, POPUP_END_DT = #{popup_end_dt}		-- 팝업종료일자
+			</if>
+			<if test="@kr.co.takeit.util.MybatisUtil@notEmpty( board_attach )">
+			, BOARD_ATTACH = #{board_attach}		-- 게시판첨부파일
+			</if>
+		WHERE PROJECT_CD = #{project_cd}		-- 프로젝트코드
+		  AND MENU_CD = #{menu_cd}				-- 메뉴코드
+		  AND BOARD_SEQ = #{board_seq}			-- 게시판일련번호
+	</update>
+
+	<delete id="boardInfoDelete" parameterType="map" timeout="0">
+		<![CDATA[
+		/*
+		 *
+		 * BoardManagement.boardInfoDelete
+		 * 게시판 삭제
+		 * @author takeit
+		 * @since 2019.08.02
+		 */
+		]]>
+		DELETE FROM BOARD_INFO
+		WHERE PROJECT_CD = #{project_cd}		-- 프로젝트코드
+			AND MENU_CD = #{menu_cd}			-- 메뉴코드
+			AND BOARD_SEQ = #{board_seq}		-- 게시판일련번호
+	</delete>
+	<!-- board_info(게시판) END -->
+
+	<!-- board_target(게시판공지대상) START -->
+	<select id="boardTargetList" parameterType="map" timeout="0" resultType="kr.co.takeit.util.TakeMap" useCache="false">
+		<![CDATA[
+		/*
+		 * BoardManagement.boardTargetList
+		 * 게시판공지대상 목록
+		 * @author takeit
+		 * @since 2019.08.02
+		 */
+		]]>
+		SELECT
+			BT.PROJECT_CD
+			, BT.MENU_CD
+			, BT.BOARD_SEQ
+			, BT.TARGET_SEQ
+			, BT.TARGET_TYPE
+			, BT.TARGET_CD
+			, U.USER_NM AS TARGET_NM
+		FROM BOARD_TARGET BT
+			LEFT OUTER JOIN USER_INFO U ON BT.TARGET_CD = U.USER_CD
+		WHERE BT.PROJECT_CD = #{project_cd}
+			AND BT.MENU_CD = #{menu_cd}
+			AND BT.BOARD_SEQ = #{board_seq}
+	</select>
+
+	<insert id="boardTargetInsert" parameterType="map" timeout="0">
+		<![CDATA[
+		/*
+		*
+		* BoardManagement.boardTargetInsert
+		* 게시판공지대상 입력
+		* @author takeit
+		* @since 2019.08.02
+		*/
+		]]>
+		<selectKey keyProperty="maxSeq" resultType="String" order="BEFORE">
+			SELECT SUBSTR(('0000' || (COALESCE(MAX(target_seq), '0')::INT + 1)), -5) AS maxSeq
+			FROM board_target
+			WHERE project_cd = #{project_cd}
+				AND menu_cd = #{menu_cd}
+				AND board_seq = #{board_seq}
+		</selectKey>
+		INSERT INTO board_target (
+			project_cd
+			, menu_cd
+			, board_seq
+			, target_seq
+			, target_type
+			, target_cd
+			, reg_dt
+			, reg_cd
+		)
+		VALUES (
+			#{project_cd}		-- 프로젝트코드
+			, #{menu_cd}		-- 메뉴코드
+			, #{maxSeq}			-- 게시판일련번호
+			, #{target_seq}		-- 대상일련번호
+			, #{target_type}	-- 대상유형
+			, #{target_cd}		-- 대상코드
+			, now()				-- 등록일시
+			, #{reg_cd}			-- 등록자코드
+		)
+	</insert>
+
+	<update id="boardTargetUpdate" parameterType="map" timeout="0">
+		<![CDATA[
+		/*
+		*
+		* BoardManagement.boardTargetUpdate
+		* 게시판공지대상 수정
+		* @author takeit
+		* @since 2019.08.02
+		*/
+		]]>
+		UPDATE board_target
+		SET
+			target_type = #{target_type}	-- 대상유형
+			, target_cd = #{target_cd}		-- 대상코드
+			, mod_dt = now()				-- 수정일시
+			, mod_cd = #{mod_cd}			-- 수정자코드
+		WHERE project_cd = #{project_cd}	-- 프로젝트코드
+			AND menu_cd = #{menu_cd}		-- 메뉴코드
+			AND board_seq = #{board_seq}	-- 게시판일련번호
+			AND target_seq = #{target_seq}	-- 대상일련번호
+	</update>
+
+	<delete id="boardTargetDelete" parameterType="map" timeout="0">
+		<![CDATA[
+		/*
+		*
+		* BoardManagement.boardTargetDelete
+		* 게시판공지대상 삭제
+		* @author takeit
+		* @since 2019.08.02
+		*/
+		]]>
+		DELETE FROM board_target
+		WHERE project_cd = #{project_cd}	-- 프로젝트코드
+			AND menu_cd = #{menu_cd}		-- 메뉴코드
+			AND board_seq = #{board_seq}	-- 게시판일련번호
+			AND target_seq = #{target_seq}	-- 대상일련번호
+	</delete>
+	<!-- board_target(게시판공지대상) END -->
+
+	<!-- board_readuser(게시판조회사용자) START -->
+	<select id="boardReaduserList" parameterType="map" timeout="0" resultType="kr.co.takeit.util.TakeMap" useCache="false">
+		<![CDATA[
+		/*
+		* BoardManagement.boardReaduserList
+		* 게시판조회사용자 목록
+		* @author takeit
+		* @since 2019.08.02
+		*/
+		]]>
+		SELECT
+			BR.project_cd			-- 프로젝트코드
+			, BR.menu_cd			-- 메뉴코드
+			, BR.board_seq			-- 게시판일련번호
+			, D.dept_nm				-- 부서명
+			, BR.user_cd			-- 사용자코드
+			, U.user_nm				-- 사용자명
+			, BR.read_cnt			-- 조회수
+			, to_char(BR.first_read_dt, 'yyyy-MM-dd HH24:mi') AS first_read_dt		-- 최초조회일시
+			, to_char(BR.last_read_dt, 'yyyy-MM-dd HH24:mi') AS last_read_dt		-- 마지막조회일시
+		FROM board_readuser BR
+			INNER JOIN user_info U ON BR.user_cd = U.user_cd
+			LEFT OUTER JOIN dept_info D ON U.dept_cd = D.dept_cd
+		WHERE BR.project_cd = #{project_cd}
+			AND BR.menu_cd = #{menu_cd}
+			<if test=" board_seq != null and board_seq != '' ">
+			AND BR.board_seq = #{board_seq}
+			</if>
+	</select>
+
+	<insert id="boardReaduserInsert" parameterType="map" timeout="0">
+		<![CDATA[
+		/*
+		 *
+		 * BoardManagement.boardReaduserInsert
+		 * 게시판조회사용자 입력
+		 * @author takeit
+		 * @since 2019.08.02
+		 */
+		]]>
+		INSERT INTO BOARD_READUSER (
+			PROJECT_CD
+			, MENU_CD
+			, BOARD_SEQ
+			, USER_CD
+			, READ_CNT
+			, FIRST_READ_DT
+			, LAST_READ_DT
+		)
+		VALUES (
+			#{project_cd}		-- 프로젝트코드
+			, #{menu_cd}		-- 메뉴코드
+			, #{board_seq}		-- 게시판일련번호
+			<choose>
+            <when test="@kr.co.takeit.util.MybatisUtil@notEmpty(_sessionUserCd)">
+            , #{_sessionUserCd}
+            </when>
+            <otherwise>
+            , 'anonymous'
+            </otherwise>
+            </choose>
+			, 1		-- 조회수
+			, SYSDATE				-- 최초조회일시
+			, SYSDATE				-- 마지막조회일시
+		)
+	</insert>
+
+	<update id="boardReaduserUpdate" parameterType="map" timeout="0">
+		<![CDATA[
+		/*
+		 *
+		 * BoardManagement.boardReaduserUpdate
+		 * 게시판조회사용자 수정
+		 * @author takeit
+		 * @since 2019.08.02
+		 */
+		]]>
+		UPDATE BOARD_READUSER
+		SET
+			READ_CNT = READ_CNT + 1			-- 조회수
+			, LAST_READ_DT = SYSDATE		-- 마지막조회일시
+		WHERE PROJECT_CD = #{project_cd}	-- 프로젝트코드
+			AND MENU_CD = #{menu_cd}		-- 메뉴코드
+			AND BOARD_SEQ = #{board_seq}	-- 게시판일련번호
+	      <choose>
+            <when test="@kr.co.takeit.util.MybatisUtil@notEmpty(_sessionUserCd)">
+            AND USER_CD = #{_sessionUserCd}
+            </when>
+            <otherwise>
+            AND USER_CD = 'anonymous'
+            </otherwise>
+          </choose>
+	</update>
+
+	<update id="boardReaduserDelete" parameterType="map" timeout="0">
+		<![CDATA[
+		/*
+		*
+		* BoardManagement.boardReaduserDelete
+		* 게시판조회사용자 삭제
+		* @author takeit
+		* @since 2019.08.02
+		*/
+		]]>
+		DELETE FROM board_readuser
+		WHERE project_cd = #{project_cd}	-- 프로젝트코드
+			AND menu_cd = #{menu_cd}		-- 메뉴코드
+			AND board_seq = #{board_seq}	-- 게시판일련번호
+		<if test="@kr.co.takeit.util.MybatisUtil@notEmpty( user_cd )">
+			AND user_cd = #{user_cd}		-- 사용자코드
+		</if>
+
+	</update>
+	<!-- board_readuser(게시판조회사용자) END -->
+
+	<!-- board_reply(게시판댓글정보) START -->
+	<select id="boardReplyList" parameterType="map" timeout="0" resultType="int" useCache="false">
+		<![CDATA[
+		/*
+		 * BoardManagement.boardReplyList
+		 * 게시판댓글정보 목록
+		 * @author takeit
+		 * @since 2019.08.02
+		 */
+		]]>
+	  SELECT BR.project_cd			-- 프로젝트코드
+		   , BR.menu_cd			    -- 메뉴코드
+		   , BR.board_seq			-- 게시판일련번호
+		   , BR.reply_seq			-- 댓글일련번호
+		   , BR.reply_txt			-- 댓글내용
+		   , TO_CHAR(BR.reg_dt, 'YYYY-MM-DD HH24:MI') AS reg_dt	-- 등록일시
+		   , BR.reg_cd				-- 등록자코드
+		   , U1.user_nm AS reg_nm	-- 등록자명
+		   , TO_CHAR(BR.mod_dt, 'YYYY-MM-DD HH24:MI') AS mod_dt	-- 수정일시
+		   , BR.mod_cd				-- 수정자코드
+		   , U2.user_nm AS mod_nm	-- 수정자명
+		FROM board_reply BR
+		LEFT OUTER JOIN user_info U1 ON BR.reg_cd = U1.user_cd
+		LEFT OUTER JOIN user_info U2 ON BR.mod_cd = U2.user_cd
+	   WHERE BR.project_cd = #{project_cd}
+		 AND BR.menu_cd = #{menu_cd}
+		 AND BR.board_seq = #{board_seq}
+	   ORDER BY BR.reply_seq
+	</select>
+
+	<insert id="boardReplyInsert" parameterType="map" timeout="0">
+		<![CDATA[
+		/*
+		*
+		* BoardManagement.boardReplyInsert
+		* 게시판댓글정보 입력
+		* @author takeit
+		* @since 2019.08.02
+		*/
+		]]>
+		<selectKey keyProperty="maxSeq" resultType="String" order="BEFORE">
+			SELECT SUBSTR(('0000' || (COALESCE(MAX(reply_seq), '0')::INT + 1)), -5) AS maxSeq
+			FROM board_reply
+			WHERE project_cd = #{project_cd}
+				AND menu_cd = #{menu_cd}
+				AND board_seq = #{board_seq}
+		</selectKey>
+		INSERT INTO board_reply (
+			project_cd
+			, menu_cd
+			, board_seq
+			, reply_seq
+			, reply_txt
+			, reg_dt
+			, reg_cd
+		)
+		VALUES (
+			#{project_cd}		-- 프로젝트코드
+			, #{menu_cd}		-- 메뉴코드
+			, #{board_seq}		-- 게시판일련번호
+			, #{maxSeq}			-- 댓글일련번호
+			, #{reply_txt}		-- 댓글내용
+			, now()				-- 등록일시
+			, #{reg_cd}			-- 등록자코드
+		)
+	</insert>
+
+	<update id="boardReplyUpdate" parameterType="map" timeout="0">
+		<![CDATA[
+		/*
+		*
+		* BoardManagement.boardReplyUpdate
+		* 게시판댓글정보 수정
+		* @author takeit
+		* @since 2019.08.02
+		*/
+		]]>
+		UPDATE board_reply
+		SET
+			reply_txt = #{reply_txt}		-- 댓글내용
+			, mod_dt = now()				-- 수정일시
+			, mod_cd = #{mod_cd}			-- 수정자코드
+		WHERE project_cd = #{project_cd}	-- 프로젝트코드
+			AND menu_cd = #{menu_cd}		-- 메뉴코드
+			AND board_seq = #{board_seq}	-- 게시판일련번호
+			AND reply_seq = #{reply_seq}	-- 댓글일련번호
+	</update>
+
+	<delete id="boardReplyDelete" parameterType="map" timeout="0">
+		<![CDATA[
+		/*
+		*
+		* BoardManagement.boardReplyDelete
+		* 게시판댓글정보 삭제
+		* @author takeit
+		* @since 2019.08.02
+		*/
+		]]>
+		DELETE FROM board_reply
+		WHERE project_cd = #{project_cd}	-- 프로젝트코드
+			AND menu_cd = #{menu_cd}		-- 메뉴코드
+			AND board_seq = #{board_seq}	-- 게시판일련번호
+			AND reply_seq = #{reply_seq}	-- 댓글일련번호
+	</delete>
+	<!-- board_reply(게시판댓글정보) END -->
+</mapper>

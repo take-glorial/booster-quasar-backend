@@ -1,0 +1,359 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="kr.co.takeit.mapper.TakeCommonMapper">
+	<!-- Login -->
+	<select id="login" parameterType="map" resultType="map">
+		SELECT
+		    A.CUST_ID USER_ID,
+		    A.PASS_WORD PASS_WD,
+		    B.COMP_CD,
+		    A.CUST_CODE,
+		    B.CUST_NM,
+		    A.CUST_GBN,
+		    A.TRANS_YN,
+		    B.BUSI_NO,
+		    B.LEDR,
+		    B.CMPY_KIND
+		FROM
+		    SSWEB_USER A
+		    INNER JOIN SSAZ2100 B ON A.CUST_CODE = B.CUST_CODE
+		WHERE A.CUST_ID = #{USER_ID} AND A.PASS_WORD = #{PASS_WD}
+	</select>
+	
+	<!-- Personalization -->
+	<select id="userGridCheck" parameterType="map" timeout="0" resultType="map" useCache="false">
+		SELECT count(*) AS CNT
+		FROM EBIZ_USER_GRID_CONFIG
+		WHERE USER_ID = #{session_id}
+			AND PROG_ID = #{prog_id}
+			AND GRID_ID = #{grid_id}
+	</select>
+	
+	<delete id="userGridDelete" parameterType="map" timeout="0">
+		DELETE FROM EBIZ_USER_GRID_CONFIG
+		WHERE 
+			USER_ID=#{sUserId} 
+			AND PROG_ID=#{sProgId} 
+			AND GRID_ID=#{sGridId}
+	</delete>
+	
+	<insert id="userGridInsert" parameterType="map" timeout="0">
+		INSERT INTO EBIZ_USER_GRID_CONFIG
+		(
+		    USER_ID, 
+		    PROG_ID, 
+		    GRID_ID, 
+		    GRID_FORMAT, 
+		    ORDER_CFG,
+		    FILTER_CFG,
+		  	FIT_CFG,
+		    REG_DT
+		) 
+		VALUES 
+		(
+		    #{USER_ID}, 
+		    #{PROG_ID},
+		    #{GRID_ID},
+		    #{GRID_FORMAT},
+		    #{ORDER_CFG},
+		    #{FILTER_CFG},
+		    #{FIT_CFG},		    
+		    NOW()
+		)
+	</insert>
+	
+	<select id="userGridSelect" parameterType="map" timeout="0" resultType="map" useCache="false">
+		SELECT USER_ID, 
+		       PROG_ID, 
+		       GRID_ID, 
+		       GRID_FORMAT, 
+			   ORDER_CFG,
+			   FILTER_CFG,
+			   FIT_CFG,
+		       REG_DT, 
+		       MOD_DT 
+		FROM EBIZ_USER_GRID_CONFIG
+		WHERE USER_ID = #{sUserId}
+		   AND PROG_ID = #{sProgId}
+	</select>
+	
+	<update id="userGridUpdate" parameterType="map" timeout="0">
+		UPDATE EBIZ_USER_GRID_CONFIG 
+		SET GRID_FORMAT	= #{grid_format},
+			ORDER_CFG	= #{order_cfg},
+			FILTER_CFG	= #{filter_cfg},
+			FIT_CFG 	= #{fit_cfg},
+			MOD_DT		= NOW()
+		WHERE USER_ID	= #{session_id} 
+			AND PROG_ID	= #{prog_id} 
+			AND GRID_ID = #{grid_id}
+	</update>
+	
+	<!-- Popup -->
+	<select id="comSystemCodeGroupSelect" parameterType="map" timeout="0" resultType="map" useCache="false">
+		SELECT CODE_ID AS CODE, 
+			CODE_NM AS NAME
+		FROM EBIZ_CCODE
+		WHERE GROUP_ID = '0000'
+			AND USE_YN = 'Y'
+		<if test="code != null and code != '' ">
+		    AND 
+			(
+				CODE_ID LIKE CONCAT('%' , #{code} , '%') OR CODE_NM LIKE CONCAT('%' , #{code} , '%')
+			)
+		</if>
+		ORDER BY CODE_KEY, CODE_ORD
+	</select>
+	
+	<select id="comSystemCodeSelect" parameterType="map" timeout="0" resultType="map" useCache="false">
+		SELECT CODE_ID AS CODE, 
+			CODE_NM AS NAME
+		FROM EBIZ_CCODE
+		WHERE USE_YN = 'Y'
+		<if test="code != null and code != '' ">
+		    AND 
+			(
+				CODE_ID LIKE CONCAT('%' , #{code} , '%') OR CODE_NM LIKE CONCAT('%' , #{code} , '%')
+			)
+		</if>
+		ORDER BY CODE_KEY, CODE_ORD
+	</select>
+	
+	<select id="comSystemProgramSelect" parameterType="map" timeout="0" resultType="map" useCache="false">
+		SELECT PROG_ID AS CODE
+			, PROG_NM AS NAME
+		FROM EBIZ_PROGRAM
+		WHERE USE_YN = 'Y'
+		AND PROG_TYPE = '03'
+		<if test="code != null and code != '' ">
+		    AND 
+			(
+				PROG_ID LIKE CONCAT('%' , #{code} , '%') OR PROG_NM LIKE CONCAT('%' , #{code} , '%')
+			)
+		</if>
+		ORDER BY PROG_ID
+	</select>
+	
+	<select id="comSystemRoleSelect" parameterType="map" timeout="0" resultType="map" useCache="false">
+		SELECT ROLE_CD AS CODE
+			, ROLE_NM AS NAME
+		FROM EBIZ_ROLEINFO
+		WHERE USE_YN = 'Y'
+		<if test="code != null and code != '' ">
+		    AND 
+			(
+				ROLE_CD LIKE CONCAT('%' , #{code} , '%') OR ROLE_NM LIKE CONCAT('%' , #{code} , '%')
+			)
+		</if>
+		ORDER BY ROLE_CD
+	</select>
+	
+	<select id="comSystemSystemSelect" parameterType="map" timeout="0" resultType="map" useCache="false">
+		SELECT PROG_ID AS CODE, 
+			PROG_NM AS NAME
+		FROM EBIZ_PROGRAM
+		WHERE PROG_TYPE = '01'
+			AND USE_YN = 'Y'
+		<if test="code != null and code != '' ">
+		    AND 
+			(
+				PROG_ID LIKE CONCAT('%' , #{code} , '%') OR PROG_NM LIKE CONCAT('%' , #{code} , '%')
+			)
+		</if>
+		ORDER BY PROG_ORDER
+	</select>
+	
+	<select id="comSystemUserSelect" parameterType="map" timeout="0" resultType="map" useCache="false">
+		SELECT
+		    A.CUST_ID AS CODE
+			, B.CUST_NM AS NAME
+		FROM SSWEB_USER A
+		    INNER JOIN SSAZ2100 B ON A.CUST_CODE = B.CUST_CODE
+		WHERE 1 = 1
+		<if test="code != null and code != '' ">
+		    AND 
+			(
+				A.CUST_ID LIKE CONCAT('%' , #{code} , '%') OR B.CUST_NM LIKE CONCAT('%' , #{code} , '%')
+			)
+		</if>
+	</select>
+	
+	<!-- Role -->
+	<select id="menuSearchSelect" parameterType="map" timeout="0" resultType="map" useCache="false">
+		SELECT p.PROG_ID, p.PROG_NM, p.PROG_PREFIX, p.MENU_URL, LTRIM (SYS_CONNECT_BY_PATH (p.PROG_NM, ' > '), ' > ') AS PROG_PATH
+		FROM EBIZ_PROGRAM p
+		WHERE p.DISPLAY_YN = 'Y'
+			AND p.USE_YN = 'Y'
+			AND p.PROG_TYPE = '03'
+			AND p.PROG_NM LIKE CONCAT('%' , #{sProgNm} , '%')
+			AND p.PROG_ID IN (
+				SELECT roleprog.PROG_ID 
+				FROM EBIZ_USER_ROLE userRole
+					INNER JOIN EBIZ_ROLE_PROGRAM roleprog ON userRole.ROLE_CD = roleprog.ROLE_CD
+				WHERE userRole.USER_ID =  #{sessionUserId}
+			)
+		START WITH p.P_PROG_ID = '0'
+		CONNECT BY PRIOR PROG_ID = P_PROG_ID
+		ORDER BY p.PROG_ORDER
+	</select>
+	
+	<select id="userButtonRoleSelect" parameterType="map" timeout="0" resultType="map" useCache="false">
+		SELECT MAX(roleprog.R_READ) as R_READ,
+		       MAX(roleprog.R_INPUT) as R_INPUT,
+		       MAX(roleprog.R_SAVE) as R_SAVE,
+		       MAX(roleprog.R_DELETE) as R_DELETE, 
+		       MAX(roleprog.R_PRINT) as R_PRINT,
+		       MAX(roleprog.R_EXCEL) as R_EXCEL
+		FROM EBIZ_USER_ROLE userRole
+		   INNER JOIN EBIZ_ROLE_PROGRAM roleprog ON userRole.ROLE_CD = roleprog.ROLE_CD
+		   INNER JOIN EBIZ_PROGRAM prog ON roleprog.PROG_ID = prog.PROG_ID
+		WHERE roleprog.USE_YN = 'Y'
+			AND prog.USE_YN = 'Y'
+			AND userRole.USER_ID =  #{sessionUserId}
+			AND roleprog.PROG_ID = #{sProgId}
+		group by userRole.USER_ID, roleprog.PROG_ID, prog.PROG_NM, prog.PROG_DEPTH, roleprog.R_READ, roleprog.R_INPUT, roleprog.R_SAVE, roleprog.R_DELETE, roleprog.R_PRINT, roleprog.R_EXCEL
+		order by roleprog.PROG_ID ASC
+	</select>
+	
+	<select id="userCommonButtonSelect" parameterType="map" timeout="0" resultType="map" useCache="false">
+		SELECT MAX(roleprog.R_READ) as R_READ,
+		       MAX(roleprog.R_INPUT) as R_INPUT,
+		       MAX(roleprog.R_SAVE) as R_SAVE,
+		       MAX(roleprog.R_DELETE) as R_DELETE, 
+		       MAX(roleprog.R_PRINT) as R_PRINT,
+		       MAX(roleprog.R_EXCEL) as R_EXCEL
+		FROM EBIZ_USER_ROLE userRole
+		   INNER JOIN EBIZ_ROLE_PROGRAM roleprog ON userRole.role_cd = roleprog.role_cd
+		   INNER JOIN EBIZ_PROGRAM prog ON roleprog.prog_id = prog.prog_id
+		WHERE roleprog.USE_YN = 'Y'
+			AND prog.USE_YN = 'Y'
+			AND userRole.USER_ID = #{sessionUserId}
+			AND roleprog.PROG_ID = #{sProgId}
+		group by userRole.USER_ID, roleprog.PROG_ID, prog.PROG_NM, prog.PROG_DEPTH, roleprog.R_READ, roleprog.R_INPUT, roleprog.R_SAVE, roleprog.R_DELETE, roleprog.R_PRINT, roleprog.R_EXCEL
+		order by roleprog.PROG_ID asc
+	</select>
+	
+	<select id="userHideMenuSelect" parameterType="map" timeout="0" resultType="map" useCache="false">
+		SELECT p.PROG_ID, 
+		       p.SYSTEM_DIV, 
+		       p.P_PROG_ID, 
+		       p.PROG_DEPTH AS LEV, 
+		       p.PROG_NM,
+		       p.PROG_TYPE, 
+		       p.MENU_URL, 
+		       p.PROG_ORDER, 
+		       p.DISPLAY_YN, 
+		       p.MANUAL_URL, 
+		       p.PROG_DESC,
+		       p.PROG_PREFIX 
+		FROM EBIZ_USER_ROLE ur
+		      INNER JOIN EBIZ_ROLE_PROGRAM rp ON ur.ROLE_CD = rp.ROLE_CD
+		      INNER JOIN EBIZ_PROGRAM p ON rp.PROG_ID = p.PROG_ID
+		WHERE p.USE_YN 				= 'Y'
+		      AND p.DISPLAY_YN 		= 'N'
+			  AND p.SYSTEM_TYPE 	= '01'
+			  AND p.PROG_PREFIX 	!= 'Dash'
+		      AND ur.USER_ID 		=  #{sessionUserId}
+		GROUP BY p.PROG_ID, 
+		       p.SYSTEM_DIV, 
+		       p.P_PROG_ID, 
+		       p.PROG_DEPTH, 
+		       p.PROG_NM,
+		       p.PROG_TYPE, 
+		       p.MENU_URL, 
+		       p.PROG_ORDER, 
+		       p.DISPLAY_YN, 
+		       p.MANUAL_URL, 
+		       p.PROG_DESC,
+		       p.PROG_PREFIX 
+		ORDER BY p.PROG_ORDER
+	</select>
+	
+	<select id="userMenuSelect" parameterType="map" timeout="0" resultType="map" useCache="false">
+		SELECT p.PROG_ID, 
+		       p.SYSTEM_DIV, 
+		       p.P_PROG_ID, 
+		       p.PROG_DEPTH AS LEV, 
+		       p.PROG_NM,
+		       p.PROG_TYPE, 
+		       p.MENU_URL, 
+		       p.PROG_ORDER, 
+		       p.DISPLAY_YN, 
+		       p.MANUAL_URL, 
+		       p.PROG_DESC,
+		       p.PROG_PREFIX 
+		FROM EBIZ_USER_ROLE ur
+		      INNER JOIN EBIZ_ROLE_PROGRAM rp ON ur.ROLE_CD = rp.ROLE_CD
+		      INNER JOIN EBIZ_PROGRAM p ON rp.PROG_ID = p.PROG_ID
+		WHERE p.USE_YN 			= 'Y'
+		      AND p.DISPLAY_YN 	= 'Y'
+			  AND p.SYSTEM_TYPE = '01'
+		      AND ur.USER_ID 	= #{sessionUserId}
+		GROUP BY p.PROG_ID, 
+		       p.SYSTEM_DIV, 
+		       p.P_PROG_ID, 
+		       p.PROG_DEPTH, 
+		       p.PROG_NM,
+		       p.PROG_TYPE, 
+		       p.MENU_URL, 
+		       p.PROG_ORDER, 
+		       p.DISPLAY_YN, 
+		       p.MANUAL_URL, 
+		       p.PROG_DESC,
+		       p.PROG_PREFIX 
+		ORDER BY p.PROG_ORDER
+	</select>
+	
+	<delete id="userMyMenuDelete" parameterType="map" timeout="0">
+		DELETE FROM EBIZ_USER_MYMENU 
+		WHERE USER_ID = #{session_id}
+		<if test="prog_id != null and prog_id != '' ">
+		    AND PROG_ID = #{prog_id} 
+		</if>
+	</delete>
+	
+	<insert id="userMyMenuInsert" parameterType="map" timeout="0">
+		INSERT INTO EBIZ_USER_MYMENU 
+		(
+		    USER_ID, 
+		    PROG_ID, 
+		    REG_DT, 
+		    REG_USER
+		) 
+		VALUES 
+		(
+		    #{session_id}, 
+		    #{prog_id}, 
+		    NOW(), 
+		    #{reg_user}
+		) 
+	</insert>
+	
+	<select id="userMyMenuSelect" parameterType="map" timeout="0" resultType="map" useCache="false">
+		SELECT um.PROG_ID,
+		       p.PROG_NM
+		FROM EBIZ_USER_MYMENU um
+		      INNER JOIN EBIZ_PROGRAM p ON um.PROG_ID = p.PROG_ID
+		WHERE p.USE_YN = 'Y'
+			AND um.USER_ID = #{sessionUserId}
+	</select>
+	
+	<update id="userMyMenuUpdate" parameterType="map" timeout="0">
+		UPDATE EBIZ_USER_MYMENU 
+		SET REG_DT	= #{reg_dt},
+			REG_USER= #{reg_user}
+		WHERE USER_ID=#{session_id} AND PROG_ID=#{prog_id}
+	</update>
+	
+	<select id="userProgramRoleCheck" parameterType="map" timeout="0" resultType="map" useCache="false">
+		SELECT count(*) AS CNT
+		FROM EBIZ_USER_ROLE a
+		      INNER JOIN EBIZ_ROLE_PROGRAM b ON a.ROLE_CD = b.ROLE_CD
+		WHERE a.USER_ID 	= #{sessionUserId}
+		      AND b.PROG_ID = #{sProgId}
+		      AND b.USE_YN 	= 'Y'
+	</select>
+</mapper>

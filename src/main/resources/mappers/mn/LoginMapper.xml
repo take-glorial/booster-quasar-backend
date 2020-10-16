@@ -1,0 +1,197 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+* 로그인 관련
+*
+* @filename mappers/mn/LoginMapper.xml
+* @author takeit
+* @since 2020.08.10
+* @version 1.0
+* @see
+*
+* << 변경 이력(Modification Information) >>
+*
+* 변경번호 : #1
+* 변경일자 : 2020.08.10
+* 변경사람 : takeit
+* 변경내용 : 신규 생성
+ -->
+<mapper namespace="Login">
+	<!-- Login -->
+	<select id="userLogin" parameterType="map" timeout="0" resultType="kr.co.takeit.util.TakeMap" useCache="false">
+		<![CDATA[
+		/*
+		 * Login.userLogin
+		 * 로그인 처리
+		 * @author takeit
+		 * @since 2020.08.10
+		 */
+		]]>
+		SELECT
+			U.USER_CD													-- 사용자코드
+			, U.USER_ID													-- 사용자ID
+			, U.USER_NM													-- 사용자명
+			, U.USER_ENG_NM												-- 사용자영문명
+			, U.USER_BIRTHDAY											-- 사용자생년월일
+			, U.LUNAR_CD												-- 양력음력구분
+			, U.USER_EMAIL												-- 사용자이메일
+			, U.USER_MOBILE												-- 사용자휴대폰번호
+			, U.USER_TEL												-- 사용자전화번호
+			, U.USER_FAX												-- 사용자FAX
+			, U.DEPT_CD													-- 부서코드
+			, '' AS DEPT_NM
+			, U.USER_POSITION											-- 사용자직위
+			, U.USER_GRADE												-- 사용자등급
+			, U.USER_STATUS												-- 사용자상태
+			, U.DESC_TXT												-- 상세설명
+			, U.USE_YN													-- 사용여부
+			, U.AGREE_YN												-- 동의여부
+			, U.AGREE_DT												-- 동의일시
+			, TO_CHAR(U.LOGIN_FAIL_CNT) AS LOGIN_FAIL_CNT				-- 로그인실패횟수
+			, U.PW_CHANGE_DT											-- 비밀번호변경일시
+			--, NVL(TO_CHAR((SYSDATE - U.PW_CHANGE_DT), 'DD'), '0') AS PW_CHANGE_CNT	-- 비밀번호 변경일 수
+			, TO_CHAR(TRUNC(SYSDATE - U.PW_CHANGE_DT)) AS PW_CHANGE_CNT	-- 비밀번호 변경일 수
+			, NVL(U.INIT_YN, 'Y') AS INIT_YN							-- 초기화여부
+			, (SELECT TO_CHAR(COUNT(*)) AS CNT FROM PROJECT_USER X WHERE X.USER_CD = U.USER_CD) AS PROJECT_CNT --소속 프로젝트 수
+			, U.MAIN_PROJECT AS PROJECT_CD
+			, P.PROJECT_NM AS PROJECT_NM
+			, NVL((SELECT 'Y' FROM PROJECT_USER_ROLE WHERE PROJECT_CD = 'PM00000001' AND ROLE_CD = 'R0001' AND USER_CD = U.USER_CD), 'N') AS ADMIN_YN
+			, U.LOGIN_IP
+			, U.REG_DT
+			, NVL(U.VALID_YN, 'N') AS VALID_YN			-- 데모사용자여부
+            , (CASE WHEN (SYSDATE BETWEEN TO_DATE(U.VALID_START_DATE, 'YYYY-MM-DD') AND TO_DATE(U.VALID_END_DATE, 'YYYY-MM-DD'))
+                    THEN 'Y'
+                    ELSE 'N' END) AS VALID_DT_YN
+            , R.ROLE_CD                     -- 사용자 권한
+            , PR.MAIN_URL                   -- 권한 메인 화면
+		FROM USER_INFO U
+			LEFT OUTER JOIN PROJECT_INFO P ON U.MAIN_PROJECT = P.PROJECT_CD
+			LEFT OUTER JOIN PROJECT_USER_ROLE R ON U.MAIN_PROJECT = R.PROJECT_CD AND U.USER_CD = R.USER_CD AND ROWNUM=1  --중복권한 임시처리
+			LEFT OUTER JOIN PROJECT_ROLE PR ON U.MAIN_PROJECT = PR.PROJECT_CD AND R.ROLE_CD = PR.ROLE_CD
+		WHERE U.USER_ID = #{sUserId}
+			AND U.USER_PW = #{sUserPw}
+	</select>
+
+	<select id="userMenuSelect" parameterType="map" timeout="0" resultType="kr.co.takeit.util.TakeMap" useCache="false">
+		<![CDATA[
+		/*
+		 * Login.userMenuSelect
+		 * 메뉴 조회
+		 * @author takeit
+		 * @since 2020.08.10
+		 */
+		]]>
+		SELECT PUR.PROJECT_CD
+            , PM.MENU_CD					-- 메뉴코드
+			, PM.DEVICE_TYPE				-- 디바이스 유형
+			, PM.ROOT_MENU					-- ROOT메뉴
+			, PM.PARENT_MENU				-- 부모 메뉴코드
+			, PM.MENU_LEVEL					-- 메뉴LEVEL
+			, PM.MENU_NM					-- 메뉴명
+			, PM.MENU_TYPE					-- 메뉴유형
+			, P.PROGRAM_ID AS MENU_URL		-- 메뉴URL(*.XFDL)
+			, PM.MENU_ORDER					-- 정렬순서
+			, PM.DESC_TXT					-- 상세설명
+			, P.PROGRAM_PREFIX 				-- 메뉴PREFIX
+			, (CASE WHEN UM.MENU_CD IS NULL THEN 'N' ELSE 'Y' END) AS MYMENU_YN
+		FROM PROJECT_USER_ROLE PUR
+		    INNER JOIN USER_INFO U ON U.USER_CD = PUR.USER_CD
+			INNER JOIN PROJECT_ROLE_MENU PRM ON PUR.PROJECT_CD = PRM.PROJECT_CD
+			  AND PUR.ROLE_CD = PRM.ROLE_CD
+			  AND ( R_READ = 'Y' OR R_INPUT = 'Y' OR R_DELETE = 'Y' OR R_SAVE = 'Y' OR R_PRINT = 'Y' OR R_EXCEL = 'Y' )
+			INNER JOIN PROJECT_MENU PM ON PRM.PROJECT_CD = PM.PROJECT_CD AND PRM.MENU_CD = PM.MENU_CD
+			LEFT OUTER JOIN PROGRAM_INFO P ON P.USE_YN = 'Y' AND PM.PROGRAM_CD = P.PROGRAM_CD
+			LEFT OUTER JOIN CODE_INFO C ON C.GROUP_ID = '00006' AND P.PROGRAM_PREFIX = C.CODE_ID
+			LEFT OUTER JOIN USER_MYMENU UM ON UM.PROJECT_CD = PM.PROJECT_CD
+			 AND UM.USER_CD = PUR.USER_CD
+			 AND UM.MENU_CD = PRM.MENU_CD
+		WHERE PM.USE_YN = 'Y'
+			AND PM.PROJECT_CD = #{sProjectCd}
+			AND PUR.USER_CD = #{_sessionUserCd}
+		GROUP BY PUR.PROJECT_CD
+		    , PM.MENU_CD
+			, PM.DEVICE_TYPE
+			, PM.ROOT_MENU
+			, PM.PARENT_MENU
+			, PM.MENU_LEVEL
+			, PM.MENU_NM
+			, PM.MENU_TYPE
+			, P.PROGRAM_ID
+			, PM.MENU_ORDER
+			, PM.DESC_TXT
+			, P.PROGRAM_PREFIX
+			, UM.MENU_CD
+		ORDER BY PM.MENU_ORDER
+	</select>
+
+	<select id="projectMenuSelect" parameterType="map" timeout="0" resultType="kr.co.takeit.util.TakeMap" useCache="false">
+		<![CDATA[
+		/*
+		 * Login.projectMenuSelect
+		 * 전체 메뉴 조회
+		 * @author takeit
+		 * @since 2020.08.10
+		 */
+		]]>
+		SELECT PM.MENU_CD					-- 메뉴코드
+			, PM.DEVICE_TYPE				-- 디바이스 유형
+			, PM.ROOT_MENU					-- ROOT메뉴
+			, PM.PARENT_MENU				-- 부모 메뉴코드
+			, PM.MENU_LEVEL					-- 메뉴LEVEL
+			, PM.MENU_NM					-- 메뉴명
+			, PM.MENU_TYPE					-- 메뉴유형
+			, P.PROGRAM_ID AS MENU_URL		-- 메뉴URL(*.XFDL)
+			, PM.MENU_ORDER					-- 정렬순서
+			, PM.DESC_TXT					-- 상세설명
+			, P.PROGRAM_PREFIX 				-- 메뉴PREFIX
+		FROM PROJECT_MENU PM
+			LEFT OUTER JOIN PROGRAM_INFO P ON P.USE_YN = 'Y' AND PM.PROGRAM_CD = P.PROGRAM_CD
+		WHERE PM.USE_YN = 'Y'
+			AND PM.PROJECT_CD = #{sProjectCd}
+		ORDER BY PM.ROOT_MENU, PM.MENU_ORDER
+	</select>
+
+	<select id="userInfo" parameterType="map" timeout="0" resultType="kr.co.takeit.util.TakeMap" useCache="false">
+		<![CDATA[
+		/*
+		 * Login.userInfo
+		 * 로그인 사용자 정보 조회
+		 * @author takeit
+		 * @since 2020.08.10
+		 */
+		]]>
+		SELECT
+			U.USER_CD													-- 사용자코드
+			, U.USER_ID													-- 사용자ID
+			, U.USER_NM													-- 사용자명
+			, U.USER_ENG_NM												-- 사용자영문명
+			, U.USER_BIRTHDAY											-- 사용자생년월일
+			, U.LUNAR_CD												-- 양력음력구분
+			, U.USER_EMAIL												-- 사용자이메일
+			, U.USER_MOBILE												-- 사용자휴대폰번호
+			, U.USER_TEL												-- 사용자전화번호
+			, U.USER_FAX												-- 사용자FAX
+			, U.DEPT_CD													-- 부서코드
+			, '' AS DEPT_NM   -- 부서명
+			, U.USER_POSITION											-- 사용자직위
+			, U.USER_GRADE												-- 사용자등급
+			, U.USER_STATUS												-- 사용자상태
+			, U.DESC_TXT												-- 상세설명
+			, U.USE_YN													-- 사용여부
+			, U.AGREE_YN												-- 동의여부
+			, U.AGREE_DT												-- 동의일시
+			, U.LOGIN_FAIL_CNT											-- 로그인실패횟수
+			, U.PW_CHANGE_DT											-- 비밀번호변경일시
+			, TO_CHAR(TRUNC(SYSDATE - U.PW_CHANGE_DT)) AS PW_CHANGE_CNT	-- 비밀번호 변경일 수
+			, U.INIT_YN													-- 초기화여부
+			, (SELECT TO_CHAR(COUNT(*)) AS CNT FROM PROJECT_USER X WHERE X.USER_CD = U.USER_CD) AS PROJECT_CNT --소속 프로젝트 수
+			, U.MAIN_PROJECT AS PROJECT_CD
+			, LOGIN_IP
+			, REG_DT
+		FROM USER_INFO U
+		WHERE U.USER_CD = #{_sessionUserCd}
+	</select>
+
+</mapper>

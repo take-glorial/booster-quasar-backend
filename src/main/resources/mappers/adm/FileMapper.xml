@@ -1,0 +1,214 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+* 첨부파일 관련
+*
+* @filename mapper/FileMapper.xml
+* @author takeit
+* @since 2019.12.09
+* @version 1.0
+* @see
+*
+* << 변경 이력(Modification Information) >>
+*
+* 변경번호 : #1
+* 변경일자 : 2019.12.09
+* 변경사람 : takeit
+* 변경내용 : 신규 생성
+
+-->
+<mapper namespace="File">
+
+<!--
+ ===================
+ ATTACH_INFO 기반
+ ===================
+ attachInfoInsert
+ attachInfoSelect
+ attachInfoFileInsert
+ attachInfoFileDelete
+ -->
+
+    <resultMap type="kr.co.takeit.util.TakeMap" id="fileMap">
+        <result column="FILE_BLOB" property="FILE_BLOB" jdbcType="CLOB" javaType="java.lang.String" />
+    </resultMap>
+
+<!-- ATTACH_INFO 기반  -->
+    <select id="typeInfo" parameterType="map" timeout="0" resultType="kr.co.takeit.util.TakeMap" useCache="false">
+        <![CDATA[
+        /*
+         * File.typeInfo
+         * 첨부파일유형 정보 조회
+         * @author takeit
+         * @since 2019.12.09
+         */
+        ]]>
+        SELECT C.CODE_KEY
+             , C.GROUP_ID
+             , C.CODE_ID AS CODE
+             , C.CODE_NM AS NAME
+             , C.PARENT_KEY
+             , C.CODE_ORDER
+          FROM CODE_INFO C
+         WHERE C.USE_YN='Y'
+         <bind name="codeType" value='code.split(",")' />
+           AND C.GROUP_ID IN
+         <foreach collection="codeType" item="type" open="(" close=")" separator=",">
+            #{type}
+         </foreach>
+         <if test="@kr.co.takeit.util.MybatisUtil@notEmpty( sRef1 ) ">
+           AND C.REF1 = #{sRef1}
+         </if>
+         <if test="@kr.co.takeit.util.MybatisUtil@notEmpty( sRef2 ) ">
+           AND C.REF2 = #{sRef2}
+         </if>
+         <if test="@kr.co.takeit.util.MybatisUtil@notEmpty( sRef3 ) ">
+           AND C.REF3 = #{sRef3}
+         </if>
+         ORDER BY C.GROUP_ID, C.CODE_ORDER
+    </select>
+
+    <insert id="attachInfoInsert" parameterType="map" timeout="0">
+		<![CDATA[
+		/*
+		 * File.attachInfoInsert
+		 * 파일정보 입력
+		 * @author takeit
+		 * @since 2019.08.02
+		 */
+		]]>
+		<selectKey keyProperty="maxCd" resultType="String" order="BEFORE">
+			SELECT ('AF' || LPAD(TO_NUMBER((NVL(MAX(SUBSTR(ATTACH_CD, 3, 9)), '0') + 1) ), 8, '0')) AS maxCd
+			FROM ATTACH_INFO
+		</selectKey>
+
+		INSERT INTO ATTACH_INFO (
+			  ATTACH_CD
+			, ATTACH_TYPE
+			, REG_DT
+			, REG_CD
+            , MOD_DT
+            , MOD_CD
+		) VALUES (
+			  #{maxCd}			/* 파일Key  */
+			, #{attach_type}	/* 파일유형   */
+			, SYSDATE			/* 등록일시   */
+			, #{_sessionUserCd}	/* 등록자코드 */
+			, SYSDATE			/* 수정일시   */
+			, #{_sessionUserCd}	/* 수정자코드 */
+		)
+	</insert>
+
+    <select id="attachInfoSelect" parameterType="map" timeout="0" resultMap="fileMap" useCache="false">
+        <![CDATA[
+        /*
+         * File.attachInfoSelect
+         * 파일정보 목록
+         * @author takeit
+         * @since 2019.08.02
+         */
+        ]]>
+        SELECT F.ATTACH_CD
+             , F.FILE_SEQ
+             , F.FILE_PATH
+             , F.FILE_NM
+             , F.FILE_SAVE_NM
+             , F.IMPORT_YN
+             , F.FILE_TYPE
+             , F.FILE_SIZE
+             , F.FILE_BLOB
+             , F.DESC_TXT
+             , F.DELETE_YN
+             , TO_CHAR(F.DELETE_DT, 'YYYY-MM-DD') AS DELETE_DT
+             , TO_CHAR(F.REG_DT, 'YYYY-MM-DD') AS REG_DT
+             , F.REG_CD
+             , TO_CHAR(F.MOD_DT, 'YYYY-MM-DD') AS MOD_DT
+             , F.MOD_CD
+             , U1.USER_NM AS REG_NM  /* 등록자명  */
+             , U2.USER_NM AS MOD_NM  /* 수정자명  */
+             , '0' AS chk
+          FROM ATTACH_FILE F
+          LEFT OUTER JOIN USER_INFO U1
+            ON F.REG_CD = U1.USER_CD
+          LEFT OUTER JOIN USER_INFO U2
+            ON F.MOD_CD = U2.USER_CD
+         WHERE NVL(F.DELETE_YN, 'N') != 'Y'
+           AND F.ATTACH_CD = #{attach_cd}
+         <if test="@kr.co.takeit.util.MybatisUtil@notEmpty( file_seq )">
+           AND F.FILE_SEQ = #{file_seq}
+         </if>
+         ORDER BY F.ATTACH_CD, F.FILE_SEQ
+    </select>
+
+    <insert id="attachInfoFileInsert" parameterType="map" timeout="0">
+        <![CDATA[
+        /*
+         * File.attachInfoFileInsert
+         * 파일상세정보 입력
+         * @author takeit
+         * @since 2019.08.02
+         */
+        ]]>
+
+        <selectKey keyProperty="FILE_SEQ" resultType="String" order="BEFORE">
+            SELECT (LPAD(TO_NUMBER(NVL(MAX(SUBSTR(FILE_SEQ, 1, 10)), '0') + 1 ), 10, '0')) AS FILE_SEQ
+            FROM ATTACH_FILE
+            WHERE ATTACH_CD = #{attach_cd}
+        </selectKey>
+
+        INSERT INTO ATTACH_FILE
+            ( ATTACH_CD
+            , FILE_SEQ
+            , FILE_PATH
+            , FILE_NM
+            , FILE_SAVE_NM
+            , IMPORT_YN
+            , FILE_TYPE
+            , FILE_SIZE
+            , FILE_BLOB
+            , DESC_TXT
+            , DELETE_YN
+            , DELETE_DT
+            , REG_DT
+            , REG_CD
+        )VALUES(
+              #{attach_cd}
+            , #{file_seq}
+            , #{file_path}
+            , #{file_nm}
+            , #{file_save_nm}
+            , #{import_yn}
+            , #{file_type}
+            , #{file_size}
+            , #{file_blob,jdbcType=CLOB}
+            , #{desc_txt}
+            , #{delete_yn}
+            , #{delete_dt}
+            , SYSDATE
+            , #{_sessionUserCd}
+        )
+    </insert>
+
+    <update id="attachInfoFileDelete" parameterType="map" timeout="0">
+        <![CDATA[
+        /*
+         * File.attachInfoFileDelete
+         * 파일상세정보 삭제
+         * @author takeit
+         * @since 2019.08.02
+         */
+        ]]>
+        UPDATE ATTACH_FILE
+           SET DELETE_YN = 'Y'
+             , DELETE_DT = SYSDATE
+             , MOD_DT = SYSDATE
+             , MOD_CD = #{_sessionUserCd}
+        WHERE ATTACH_CD = #{attach_cd}      /* 파일Key */
+          AND FILE_SEQ = #{file_seq}
+    </update>
+
+<!-- ATTACH_INFO 기반 -->
+
+</mapper>

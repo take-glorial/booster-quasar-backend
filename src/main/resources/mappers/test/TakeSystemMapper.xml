@@ -1,0 +1,833 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="kr.co.takeit.mapper.TakeSystemMapper">
+	
+	<!-- Code -->
+	<delete id="codeDelete" parameterType="map" timeout="0">
+		DELETE FROM EBIZ_CCODE 
+		WHERE CODE_KEY = #{CODE_KEY}
+			OR PARENT_KEY = #{CODE_KEY}
+	</delete>
+	
+	<insert id="codeInsert" parameterType="map" timeout="0">
+		<selectKey keyProperty="CODE_MAX" resultType="String" order="BEFORE">
+			<if test = "GROUP_ID == '0000'">
+				SELECT (SUBSTR(CONCAT('0000', (CAST(COALESCE(MAX(CODE_ID), '0000') AS INT) + 1)), -4)) AS MAXID
+				FROM EBIZ_CCODE 
+				WHERE GROUP_ID = #{GROUP_ID}
+			</if>
+			<if test = "GROUP_ID != '0000'">
+				SELECT (SUBSTR(CONCAT('0000', (CAST(COALESCE(MAX(SUBSTR(CODE_KEY, 5, 4)), '0000') AS INT) + 1)), -4)) AS MAXID
+				FROM EBIZ_CCODE 
+				WHERE GROUP_ID = #{GROUP_ID}
+			</if>
+		</selectKey>
+		INSERT INTO EBIZ_CCODE 
+		(
+		    CODE_KEY,
+		    GROUP_ID, 
+		    CODE_ID, 
+		    PARENT_KEY,
+		    CODE_NM, 
+		    REF1, 
+		    REF2, 
+		    REF3, 
+		    CODE_DESC, 
+		    USE_YN, 
+		    CODE_ORD,
+		    REG_DT, 
+		    REG_USER
+		) 
+		VALUES 
+		(
+		    CONCAT(#{GROUP_ID} , #{CODE_MAX}),
+		    #{GROUP_ID}, 
+		    (case when #{GROUP_ID} = '0000' then #{CODE_MAX} else #{CODE_ID} end), 
+		    #{PARENT_KEY},
+		    #{CODE_NM}, 
+		    #{REF1}, 
+		    #{REF2}, 
+		    #{REF3}, 
+		    #{CODE_DESC}, 
+		    #{USE_YN},
+		    #{CODE_ORD}, 
+		    NOW(), 
+		    #{REG_USER}
+		) 
+	</insert>
+	
+	<select id="codeSelect" parameterType="map" timeout="0" resultType="map" useCache="false">
+		SELECT '0' AS CHK,
+		   CODE_KEY,
+		   GROUP_ID, 
+		   CODE_ID, 
+		   PARENT_KEY,
+		   CODE_NM, 
+		   REF1,
+		   REF2,
+		   REF3,
+		   CODE_DESC,
+		   USE_YN,
+		   CODE_ORD,
+		   REG_DT, 
+		   REG_USER, 
+		   MOD_DT, 
+		   MOD_USER 
+		FROM EBIZ_CCODE
+		<where>
+		<if test="sParentKey != null and sParentKey != '' ">
+		    PARENT_KEY =  #{sParentKey}
+		</if>
+		<if test="sCodeKey != null and sCodeKey != '' ">
+		    AND CODE_KEY = #{sCodeKey}
+		</if>
+		</where>
+		ORDER BY GROUP_ID, COALESCE(CODE_ORD, ''), CODE_ID
+	</select>
+	
+	<select id="codeSimpleSelect" parameterType="map" timeout="0" resultType="map" useCache="false">
+		<if test="sHeaderType != null and sHeaderType != '' and sHeaderType == 'ALL' ">
+			SELECT '' AS CODE, '전체' AS NAME
+			FROM DUAL
+			UNION ALL
+		</if>
+		<if test="sHeaderType != null and sHeaderType != '' and sHeaderType == 'SEL' ">
+			SELECT '' AS CODE, '선택' AS NAME
+			FROM DUAL
+			UNION ALL
+		</if>
+		SELECT CODE, NAME
+		FROM (
+			SELECT a.CODE_ID AS CODE, a.CODE_NM AS NAME
+			FROM EBIZ_CCODE a
+			WHERE a.GROUP_ID =  #{sGroupId}
+		
+			<if test="sRef1 != null and sRef1 != '' ">
+		  		AND a.REF1 like CONCAT('%' , #{sRef1} , '%')
+			</if>
+		  
+			<if test="sRef2 != null and sRef2 != '' ">
+		  		AND a.REF2 = #{sRef2}
+			</if>  
+		  
+			<if test="sRef3 != null and sRef3 != '' ">
+		  		AND a.REF3 = #{sRef3}
+			</if>
+		  
+			ORDER BY a.CODE_ORD, a.CODE_KEY
+		)C;
+	</select>
+	
+	<update id="codeUpdate" parameterType="map" timeout="0">
+		UPDATE EBIZ_CCODE 
+		SET 
+			CODE_ID		= #{CODE_ID},
+			CODE_NM		= #{CODE_NM},
+			REF1		= #{REF1},
+			REF2		= #{REF2},
+			REF3		= #{REF3},
+			CODE_DESC	= #{CODE_DESC},
+			USE_YN		= #{USE_YN},
+			CODE_ORD	= #{CODE_ORD},
+			MOD_DT		= NOW(),
+			MOD_USER	= #{MOD_USER}
+		WHERE CODE_KEY	= #{CODE_KEY}
+	</update>
+	
+	<select id="groupCodeSelect" parameterType="map" timeout="0" resultType="map" useCache="false">
+		with recursive cte (CODE_KEY, GROUP_ID, CODE_ID, CODE_NM, PARENT_KEY, PATH, LEV) as
+		(
+		 SELECT a.CODE_KEY, a.GROUP_ID, a.CODE_ID, a.CODE_NM, a.PARENT_KEY, CAST(a.CODE_KEY AS CHAR(500)) AS PATH, 0 as LEV
+		      FROM EBIZ_CCODE a
+		      WHERE a.PARENT_KEY IN ('0') 
+
+		<if test="GROUP_ID != null and GROUP_ID != '' ">
+		    AND a.CODE_KEY IN (
+					  	SELECT CODE_KEY FROM EBIZ_CCODE 
+					  	WHERE PARENT_KEY = '00000000'
+							AND (
+							  CODE_ID LIKE CONCAT('%' , #{GROUP_ID} , '%') OR CODE_NM LIKE CONCAT('%' , #{GROUP_ID} , '%')
+						)
+			  )
+		</if>
+		<if test="GROUP_NM != null and GROUP_NM != '' ">
+		    AND a.CODE_KEY IN (
+					  	SELECT CODE_KEY FROM EBIZ_CCODE 
+					  	WHERE PARENT_KEY = '00000000'
+							AND CODE_NM LIKE CONCAT('%' , #{GROUP_NM} , '%')
+			  )
+		</if>
+		<if test="CODE_ID != null and CODE_ID != '' ">
+			AND a.CODE_KEY IN (
+					  	SELECT CODE_KEY FROM EBIZ_CCODE 
+					  	WHERE CODE_ID LIKE CONCAT('%' , #{CODE_ID} , '%') OR CODE_NM LIKE CONCAT('%' , #{CODE_ID} , '%')
+						)
+			  
+		</if>
+		<if test="CODE_NM != null and CODE_NM != '' ">
+			AND a.CODE_KEY IN (
+					  	SELECT CODE_KEY FROM EBIZ_CCODE 
+					  	WHERE CODE_NM LIKE CONCAT('%' , #{CODE_NM} , '%')
+			  )
+		</if>
+		<if test="USE_YN != null and USE_YN != '' ">
+		    AND a.USE_YN = #{USE_YN}
+		</if>
+		  union all 
+		 SELECT a.CODE_KEY, a.GROUP_ID, a.CODE_ID, a.CODE_NM, a.PARENT_KEY, CONCAT(cte.PATH, ',', a.CODE_KEY) AS PATH, (LEV+1) AS LEV
+		 FROM EBIZ_CCODE a
+		   inner join cte
+		         on a.PARENT_KEY = cte.CODE_KEY
+		         WHERE a.PARENT_KEY IN ('00000000')
+		)
+		select * from cte
+		order by path
+	</select>
+	
+	<!-- Log -->
+	<insert id="changeLogInsert" parameterType="map" timeout="0">
+		<selectKey keyProperty="seq" resultType="String" order="BEFORE">
+			SELECT CONCAT(DATE_FORMAT(NOW(), '%Y%m%d'), SUBSTR(CONCAT('000000000', (CAST(COALESCE(MAX(SUBSTR(SEQ, 9, 9)), '000000000') AS INT) + 1)), -9)) AS MAXSEQ
+			FROM EBIZ_HISTORY_CHANGE_LOG
+			WHERE SEQ LIKE CONCAT(DATE_FORMAT(NOW(), '%Y%m%d') , '%')
+		</selectKey>
+		INSERT INTO EBIZ_HISTORY_CHANGE_LOG 
+		(
+		    SEQ, 
+		    COMPANY_CD, 
+		    SYSTEM_DIV, 
+		    HISTORY_TYPE, 
+		    HISTORY_DT, 
+		    USER_ID, 
+		    USER_NM, 
+		    H_BEFORE, 
+		    H_AFTER, 
+		    IP_ADDR, 
+		    REMARK, 
+		    SESSION_DT,
+		  	REG_USER
+		) 
+		VALUES 
+		(
+		    #{SEQ},
+		    #{COMPANY_CD}, 
+		    #{SYSTEM_DIV}, 
+		    #{HISTORY_TYPE}, 
+		    NOW(), 
+		    #{USER_ID}, 
+		    #{USER_NM}, 
+		    #{H_BEFORE}, 
+		    #{H_AFTER}, 
+		    #{IP_ADDR}, 
+		    #{REMARK}, 
+		  	#{SESSION_DT},
+		  	#{REG_USER}
+		)
+	</insert>
+	
+	<insert id="logInsert" parameterType="map" timeout="0">
+		<selectKey keyProperty="SEQ" resultType="String" order="BEFORE">
+			SELECT CONCAT(DATE_FORMAT(NOW(), '%Y%m%d'), SUBSTR(CONCAT('000000000', (CAST(COALESCE(MAX(SUBSTR(SEQ, 9, 9)), '000000000') AS INT) + 1)), -9)) AS MAXSEQ
+			FROM ebiz_history_log
+			WHERE SEQ LIKE CONCAT(DATE_FORMAT(NOW(), '%Y%m%d') , '%')
+		</selectKey>
+		INSERT INTO ebiz_history_log  
+		(
+		    SEQ, 
+		    COMPANY_CD, 
+		    SYSTEM_DIV, 
+		    SYSTEM_TYPE,
+		    LOG_DT, 
+		    USER_ID, 
+		    USER_NM, 
+		    LOG_TYPE, 
+		    PROG_ID, 
+		    IP_ADDR, 
+		    REMARK, 
+		    SESSION_DT
+		) 
+		VALUES 
+		(
+		    #{SEQ}, 
+		    #{COMPANY_CD}, 
+		    #{SYSTEM_DIV}, 
+		    #{SYSTEM_TYPE}, 
+		    NOW(), 
+		    #{USER_ID}, 
+		    #{USER_NM}, 
+		    #{LOG_TYPE}, 
+		    #{PROG_ID}, 
+		    #{IP_ADDR}, 
+		    #{REMARK}, 
+		    #{SESSION_DT}
+		) 
+	</insert>
+	
+	<select id="logSelect" parameterType="map" timeout="0" resultType="map" useCache="false">
+		SELECT h.SEQ, 
+		       h.COMPANY_CD, 
+		       h.SYSTEM_DIV,
+		       h.SYSTEM_TYPE,
+		       h.LOG_DT, 
+			   DATE_FORMAT(h.LOG_DT, '%Y-%m-%d') as LOG_DATE,
+			   DATE_FORMAT(h.LOG_DT, '%H:%i') as LOG_TIME,
+		       h.USER_ID, 
+		       h.USER_NM, 
+		       h.LOG_TYPE, 
+		       h.PROG_ID, 
+		       h.IP_ADDR, 
+		       h.REMARK, 
+		       h.SESSION_DT,
+		       CONCAT(c4.CODE_NM , ' > ' , p.PROG_NM) AS PROG_NM,
+			   c1.CODE_NM as LOG_NM,
+		       c2.CODE_NM as COMPANY_NM,
+		       c3.CODE_NM as SYSTEM_NM
+		FROM EBIZ_HISTORY_LOG h
+			INNER JOIN 
+				(SELECT * FROM EBIZ_PROGRAM WHERE PROG_TYPE in ('03','04','05','06')) p on p.MENU_URL = CONCAT(h.PROG_ID , '.xfdl')
+			INNER JOIN EBIZ_CCODE c1 ON c1.GROUP_ID = '0020' AND h.LOG_TYPE = c1.CODE_ID
+			INNER JOIN EBIZ_CCODE c2 ON c2.GROUP_ID = '0001' AND h.COMPANY_CD = c2.CODE_ID
+			INNER JOIN EBIZ_CCODE c3 ON c3.GROUP_ID = '0004' AND h.SYSTEM_DIV = c3.CODE_ID
+			INNER JOIN EBIZ_CCODE c4 ON c4.GROUP_ID = '0052' AND p.PROG_PREFIX = c4.CODE_ID
+		WHERE 1 = 1
+		<if test="FROM_DATE != null and FROM_DATE != '' ">
+		    AND DATE_FORMAT(h.LOG_DT, '%Y%m%d') <![CDATA[>=]]>  #{FROM_DATE}
+		</if>
+		<if test="END_DATE != null and END_DATE != '' ">
+		    AND DATE_FORMAT(h.LOG_DT, '%Y%m%d') <![CDATA[<=]]>  #{END_DATE}
+		</if>
+		<if test="FROM_HOUR != null and FROM_HOUR != '' ">
+		    AND DATE_FORMAT(h.LOG_DT, '%H:%i:%s') <![CDATA[>=]]>  #{FROM_HOUR}
+		</if>
+		<if test="END_HOUR != null and END_HOUR != '' ">
+		    AND DATE_FORMAT(h.LOG_DT, '%H:%i:%s') <![CDATA[<=]]>  #{END_HOUR}
+		</if>
+		<if test="PROG_ID != null and PROG_ID != '' ">
+		    AND p.MENU_URL LIKE CONCAT('%' , #{PROG_ID} , '%')
+		</if>
+		<if test="PROG_NM != null and PROG_NM != '' ">
+		    AND ( c4.CODE_NM LIKE CONCOAT('%' , #{PROG_NM} , '%') OR p.PROG_NM LIKE CONCAT('%' , #{PROG_NM} , '%' ) )
+		</if>
+		<if test="LOG_TYPE != null and LOG_TYPE != '' ">
+		    AND h.LOG_TYPE = #{LOG_TYPE}
+		</if>
+		<if test="USER_ID != null and USER_ID != '' ">
+		    AND h.USER_ID LIKE CONCAT('%' , #{USER_ID} , '%')
+		</if>
+		<if test="USER_NM != null and USER_NM != '' ">
+		    AND h.USER_NM LIKE CONCAT('%' , #{USER_NM} , '%')
+		</if>
+		ORDER BY SEQ DESC
+	</select>
+	
+	<!-- Program -->
+	<delete id="progDelete" parameterType="map" timeout="0">
+		DELETE FROM EBIZ_PROGRAM 
+		WHERE PROG_ID = #{PROG_ID}
+	</delete>
+	
+	<insert id="progInsert" parameterType="map" timeout="0">
+		<selectKey keyProperty="PROG_ID" resultType="String" order="BEFORE">
+			SELECT CONCAT('P', SUBSTR(CONCAT('000000000', (COALESCE(MAX(SUBSTR(PROG_ID, 2, 9)), '0') + 1)), -9)) AS MAXID
+			FROM EBIZ_PROGRAM
+		</selectKey>
+		INSERT INTO EBIZ_PROGRAM 
+		(
+		    PROG_ID, 
+		    SYSTEM_DIV, 
+		    P_PROG_ID, 
+		    PROG_DEPTH, 
+		    PROG_NM, 
+		    PROG_TYPE, 
+		    MENU_URL, 
+		    PROG_ORDER, 
+		    DISPLAY_YN, 
+		    MANUAL_URL, 
+		    PROG_DESC, 
+		    PROG_PREFIX,
+		    USE_YN, 
+		  	SYSTEM_TYPE,
+		    REG_DT, 
+		    REG_USER
+		) 
+		VALUES 
+		(
+		    #{PROG_ID},
+		    '01',
+		  	(case when #{PROG_TYPE} = '01' then '0' else #{P_PROG_ID} end),
+		  	(case when #{PROG_TYPE} = '01' then '0' else '1' end),
+		    #{PROG_NM}, 
+		    #{PROG_TYPE}, 
+		    #{MENU_URL}, 
+		    #{PROG_ORDER}, 
+		  	#{DISPLAY_YN},
+		    #{MANUAL_URL}, 
+		    #{PROG_DESC}, 
+		    #{PROG_PREFIX}, 
+		  	#{USE_YN},
+		  	#{SYSTEM_TYPE},
+		    NOW(), 
+		    #{REG_USER}
+		) 
+	</insert>
+	
+	<select id="progMenuSelect" parameterType="map" timeout="0" resultType="map" useCache="false">
+		SELECT a.PROG_ID AS CODE,
+		       a.PROG_NM AS NAME
+		FROM EBIZ_PROGRAM a
+		WHERE a.PROG_TYPE = '02'
+		<if test="sSystemDiv != null and sSystemDiv != '' ">
+		  AND a.SYSTEM_DIV = #{sSystemDiv}
+		</if>
+	</select>
+	
+	<select id="progSelect" parameterType="map" timeout="0" resultType="map" useCache="false">
+		SELECT a.PROG_ID, a.SYSTEM_DIV, a.P_PROG_ID, a.PROG_DEPTH, a.PROG_NM, a.PROG_TYPE, a.MENU_URL
+			, a.PROG_ORDER, a.DISPLAY_YN, a.MANUAL_URL, a.PROG_DESC, a.PROG_PREFIX, a.USE_YN, a.SYSTEM_TYPE<!-- , (LEVEL-1) AS LEV -->
+		FROM EBIZ_PROGRAM a
+		WHERE 1 = 1
+		
+		<if test="PROG_ID != null and PROG_ID != '' ">
+		    AND (
+			  		a.PROG_ID LIKE CONCAT('%' , #{PROG_ID} ,'%') OR a.PROG_NM LIKE CONCAT('%' , #{PROG_ID} ,'%')
+			 )
+		</if>
+		
+		<if test="PROG_NM != null and PROG_NM != '' ">
+		    AND a.PROG_NM LIKE CONCAT('%' , #{PROG_NM} ,'%')
+		</if>
+		
+		<if test="USE_YN != null and USE_YN != '' ">
+		    AND a.USE_YN = #{USE_YN}
+		</if>
+		
+		<if test="PROG_TYPE != null and PROG_TYPE != '' ">
+		    AND a.PROG_TYPE = #{PROG_TYPE}
+		</if>
+		
+		<!-- START WITH a.P_PROG_ID = '0' -->
+		<!-- CONNECT BY PRIOR a.PROG_ID = a.P_PROG_ID -->
+		ORDER BY a.PROG_ORDER
+	</select>
+	
+	<select id="progSystemSelect" parameterType="map" timeout="0" resultType="map" useCache="false">
+		SELECT PROG_ID AS CODE, 
+			   PROG_NM AS NAME
+		FROM EBIZ_PROGRAM
+		WHERE PROG_TYPE IN ('01', '02')
+		ORDER BY PROG_ORDER
+	</select>
+	
+	<select id="progTreeSelect" parameterType="map" timeout="0" resultType="map" useCache="false">
+		with recursive cte (PROG_ID, PROG_NM, PROG_TYPE, PROG_ORDER, PATH, LEV) as
+		(
+		 SELECT a.PROG_ID, a.PROG_NM, a.PROG_TYPE, a.PROG_ORDER, CAST(a.PROG_ID AS CHAR(500)) AS PATH, 0 as LEV
+		      FROM EBIZ_PROGRAM a
+		      WHERE a.DISPLAY_YN = 'Y'      
+		
+		<if test="SYSTEM_DIV != null and SYSTEM_DIV != '' ">
+		    AND a.SYSTEM_DIV =  #{SYSTEM_DIV}
+		</if>
+		
+		<if test="sSystemDiv != null and sSystemDiv != '' ">
+		    AND a.SYSTEM_DIV =  #{sSystemDiv}
+		</if>
+		union all
+		 SELECT a.PROG_ID, a.PROG_NM, a.PROG_TYPE, a.PROG_ORDER, CONCAT(cte.PATH, ',', a.PROG_ID) AS PATH, (LEV+1) AS LEV
+		 FROM EBIZ_PROGRAM a
+		   inner join cte
+		         on a.PROG_ID = cte.PROG_ORDER
+		         WHERE a.P_PROG_ID = '0'
+		)
+		select * from cte
+		order by path
+	</select>
+	
+	<update id="progUpdate" parameterType="map" timeout="0">
+		UPDATE EBIZ_PROGRAM 
+		SET PROG_DEPTH	= #{PROG_DEPTH},
+			PROG_NM		= #{PROG_NM},
+			PROG_TYPE	= #{PROG_TYPE},
+			MENU_URL	= #{MENU_URL},
+			PROG_ORDER	= #{PROG_ORDER},
+			DISPLAY_YN	= (case when #{DISPLAY_YN} = 'Y' then 'Y' else 'N' end),
+			MANUAL_URL	= #{MANUAL_URL},
+			PROG_DESC	= #{PROG_DESC},
+			PROG_PREFIX	= #{PROG_PREFIX},
+			USE_YN		= (case when #{USE_YN} = 'Y' then 'Y' else 'N' end),
+			SYSTEM_TYPE	= #{SYSTEM_TYPE},
+			MOD_DT		= NOW(),
+			MOD_USER	= #{MOD_USER}
+		WHERE PROG_ID	= #{PROG_ID}
+	</update>
+	
+	<!-- Role -->
+	<delete id="roleDelete" parameterType="map" timeout="0">
+		DELETE FROM EBIZ_ROLEINFO 
+		WHERE SYSTEM_DIV=#{SYSTEM_DIV} AND ROLE_CD=#{ROLE_CD} 
+	</delete>
+	
+	<insert id="roleInsert" parameterType="map" timeout="0">
+		<selectKey keyProperty="ROLE_CD" resultType="String" order="BEFORE">
+		   	SELECT CONCAT('R', SUBSTR(CONCAT('000', (CAST(COALESCE(MAX(SUBSTR(ROLE_CD, 2, 3)), '000') AS INT) + 1)), -3)) AS MAXID
+			FROM EBIZ_ROLEINFO
+		</selectKey>
+		
+		INSERT INTO EBIZ_ROLEINFO 
+		(
+		    SYSTEM_DIV, 
+		    ROLE_CD, 
+		    COMPANY_CD, 
+		    ROLE_NM, 
+		    USE_YN, 
+		    REG_DT, 
+		    REG_USER
+		) 
+		VALUES 
+		(
+		    #{SYSTEM_DIV}, 
+		    #{ROLE_CD}, 
+		    #{COMPANY_CD}, 
+		    #{ROLE_NM}, 
+		    #{USE_YN},
+		    NOW(), 
+		    #{REG_USER}
+		) 
+	</insert>
+	
+	<delete id="roleProgDelete" parameterType="map" timeout="0">
+		DELETE FROM EBIZ_ROLE_PROGRAM 
+		WHERE SYSTEM_DIV=#{SYSTEM_DIV} 
+			AND ROLE_CD=#{ROLE_CD} 
+		<if test="PROG_ID != null and PROG_ID != '' ">
+		    AND PROG_ID=#{PROG_ID} 
+		</if>
+	</delete>
+	
+	<insert id="roleProgInsert" parameterType="map" timeout="0">
+		INSERT INTO EBIZ_ROLE_PROGRAM 
+		(
+		    SYSTEM_DIV, 
+		    ROLE_CD, 
+		    PROG_ID, 
+		    R_READ, 
+		    R_INPUT, 
+		    R_SAVE, 
+		    R_DELETE, 
+		    R_PRINT, 
+		    R_EXCEL, 
+		    REG_DT, 
+		    REG_USER, 
+		    USE_YN
+		) 
+		VALUES 
+		(
+		    #{SYSTEM_DIV}, 
+		    #{ROLE_CD}, 
+		    #{PROG_ID}, 
+		    (case when #{R_READ} = '1' then 'Y' else 'N' end), 
+		    (case when #{R_INPUT} = '1' then 'Y' else 'N' end), 
+		    (case when #{R_SAVE} = '1' then 'Y' else 'N' end), 
+		    (case when #{R_DELETE} = '1' then 'Y' else 'N' end), 
+		    (case when #{R_PRINT} = '1' then 'Y' else 'N' end), 
+		    (case when #{R_EXCEL} = '1' then 'Y' else 'N' end), 
+		    NOW(), 
+		    #{REG_USER}, 
+		    (case when #{USE_YN} = '1' then 'Y' else 'N' end)
+		)
+	</insert>
+	
+	<select id="roleProgSelect" parameterType="map" timeout="0" resultType="map" useCache="false">
+		SELECT a.SYSTEM_DIV,
+		       #{sRoleCd} AS ROLE_CD, 
+		       a.PROG_ID, 
+		       a.PROG_NM,
+		       a.PROG_DEPTH AS LEV,
+		       a.PROG_TYPE,
+		       a.PROG_ORDER,
+		       (case when b.R_READ = 'Y' then '1' else '0' end) AS R_READ,
+		       (case when b.R_INPUT = 'Y' then '1' else '0' end) AS R_INPUT,
+		       (case when b.R_SAVE = 'Y' then '1' else '0' end) AS R_SAVE,
+		       (case when b.R_DELETE = 'Y' then '1' else '0' end) AS R_DELETE,
+		       (case when b.R_PRINT = 'Y' then '1' else '0' end) AS R_PRINT,
+		       (case when b.R_EXCEL = 'Y' then '1' else '0' end) AS R_EXCEL,
+		       (case when b.USE_YN = 'Y' then '1' else '0' end) AS USE_YN
+		FROM EBIZ_PROGRAM a
+			LEFT OUTER JOIN EBIZ_ROLE_PROGRAM b ON b.ROLE_CD = #{sRoleCd} AND a.PROG_ID = b.PROG_ID
+		WHERE a.SYSTEM_DIV = #{sSystemDiv}
+		ORDER BY a.PROG_ORDER
+	</select>
+	
+	<update id="roleProgUpdate" parameterType="map" timeout="0">			
+	      INSERT INTO EBIZ_ROLE_PROGRAM
+			(
+			    SYSTEM_DIV, 
+			    ROLE_CD, 
+			    PROG_ID, 
+			    R_READ, 
+			    R_INPUT, 
+			    R_SAVE, 
+			    R_DELETE, 
+			    R_PRINT, 
+			    R_EXCEL, 
+			    REG_DT, 
+			    REG_USER, 
+			    USE_YN
+			) 
+			VALUES 
+			(
+			    #{SYSTEM_DIV}, 
+			    #{ROLE_CD}, 
+			    #{PROG_ID}, 
+			    (case when #{R_READ} = '1' then 'Y' else 'N' end), 
+			    (case when #{R_INPUT} = '1' then 'Y' else 'N' end), 
+			    (case when #{R_SAVE} = '1' then 'Y' else 'N' end), 
+			    (case when #{R_DELETE} = '1' then 'Y' else 'N' end), 
+			    (case when #{R_PRINT} = '1' then 'Y' else 'N' end), 
+			    (case when #{R_EXCEL} = '1' then 'Y' else 'N' end), 
+			    NOW(), 
+			    #{REG_USER}, 
+			    (case when #{USE_YN} = '1' then 'Y' else 'N' end)
+			)
+			ON DUPLICATE KEY UPDATE
+			R_READ	= (case when #{R_READ} = '1' then 'Y' else 'N' end),
+			R_INPUT	= (case when #{R_INPUT} = '1' then 'Y' else 'N' end),
+			R_SAVE	= (case when #{R_SAVE} = '1' then 'Y' else 'N' end),
+			R_DELETE= (case when #{R_DELETE} = '1' then 'Y' else 'N' end),
+			R_PRINT	= (case when #{R_PRINT} = '1' then 'Y' else 'N' end),
+			R_EXCEL	= (case when #{R_EXCEL} = '1' then 'Y' else 'N' end),
+			MOD_DT	= NOW(),
+			MOD_USER= #{MOD_USER},
+			USE_YN	= (case when #{USE_YN} = '1' then 'Y' else 'N' end)
+	</update>
+	
+	<select id="roleSelect" parameterType="map" timeout="0" resultType="map" useCache="false">
+		SELECT '0' AS CHK,
+		   r.SYSTEM_DIV,
+		   c.CODE_NM AS SYSTEM_NAME, 
+		   r.ROLE_CD, 
+		   r.COMPANY_CD, 
+		   r.ROLE_NM, 
+		   r.USE_YN,
+		   r.REG_DT, 
+		   r.REG_USER, 
+		   r.MOD_DT, 
+		   r.MOD_USER,
+		   '0' as CHK
+		FROM EBIZ_ROLEINFO r
+			INNER JOIN EBIZ_CCODE c ON c.GROUP_ID = '0004' AND r.SYSTEM_DIV = c.CODE_ID
+		WHERE 1 = 1 
+		<if test="SYSTEM_DIV != null and SYSTEM_DIV != '' ">
+		    AND r.SYSTEM_DIV = #{SYSTEM_DIV}
+		</if>
+		<if test="ROLE_CD != null and ROLE_CD != '' ">
+		    AND (
+		    		r.ROLE_CD LIKE CONCAT('%' , #{ROLE_CD} ,'%') OR r.ROLE_NM LIKE CONCAT('%' , #{ROLE_CD} ,'%')
+		    	)
+		</if>
+		<if test="ROLE_NM != null and ROLE_NM != '' ">
+		    AND r.ROLE_NM LIKE CONCAT('%' , #{ROLE_NM} ,'%')
+		</if>
+		ORDER BY ROLE_CD
+	</select>
+	
+	<update id="roleUpdate" parameterType="map" timeout="0">
+		UPDATE EBIZ_ROLEINFO 
+		SET COMPANY_CD	= #{COMPANY_CD},
+			ROLE_NM		= #{ROLE_NM},
+			USE_YN		= #{USE_YN},
+			MOD_DT		= NOW(),
+			MOD_USER	= #{MOD_USER}
+		WHERE SYSTEM_DIV=#{SYSTEM_DIV} AND ROLE_CD=#{ROLE_CD}
+	</update>
+	
+	<!-- User -->
+	<select id="userSelect" parameterType="map" timeout="0" resultType="map" useCache="false">
+		SELECT
+		    A.CUST_ID,
+		    B.COMP_CD,
+		    A.CUST_CODE,
+		    B.CUST_NM,
+		    A.CUST_GBN,
+		    A.TRANS_YN,
+		    B.BUSI_NO,
+		    B.LEDR,
+		    B.CMPY_KIND,
+		    '' AS PASS_WORD
+		FROM
+		    SSWEB_USER A
+		    INNER JOIN SSAZ2100 B ON A.CUST_CODE = B.CUST_CODE
+		WHERE 1 = 1
+			<if test="CUST_CODE != null and CUST_CODE != '' ">
+				AND A.CUST_CODE LIKE CONCAT('%' , #{CUST_CODE} ,'%')
+			</if>
+			<if test="CUST_NM != null and CUST_NM != '' ">
+				AND B.CUST_NM LIKE CONCAT('%' , #{CUST_NM} ,'%')
+			</if>
+	</select>
+	
+	<select id="userRoleSelect" parameterType="map" timeout="0" resultType="map" useCache="false">
+		SELECT '0' AS CHK, a.USER_ID, a.ROLE_CD, b.ROLE_NM
+		FROM EBIZ_USER_ROLE a
+			INNER JOIN EBIZ_ROLEINFO b ON a.ROLE_CD = b.ROLE_CD
+		WHERE a.USER_ID = #{sCustId}
+		ORDER BY a.ROLE_CD
+	</select>
+	
+	<select id="userExistsSelect" parameterType="map" timeout="0" resultType="map" useCache="false">
+		SELECT  COALESCE(MAX('Y'), 'N') AS EXISTS_YN
+		FROM    SSWEB_USER
+		WHERE   CUST_CODE = #{sCustCode}
+	</select>
+	
+	<insert id="userInsert" parameterType="map" timeout="0">
+		INSERT INTO SSWEB_USER(CUST_ID, CUST_GBN, CUST_CODE, PASS_WORD, TRANS_YN, IN_USER, IN_DATE)
+   		VALUES(#{CUST_ID}, #{CUST_GBN}, #{CUST_CODE}, #{PASS_WORD}, #{TRANS_YN}, #{IN_USER}, NOW())
+	</insert>
+	
+	<update id="userUpdate" parameterType="map" timeout="0">
+		UPDATE SSWEB_USER
+		SET 
+			CUST_GBN = #{CUST_GBN}
+			, PASS_WORD = #{PASS_WORD}
+			, TRANS_YN = #{TRANS_YN}
+			, UP_USER = #{UP_USER}
+			, UP_DATE = NOW()
+		WHERE CUST_ID = #{CUST_ID}
+	</update>
+	
+	<delete id="userDelete" parameterType="map" timeout="0">
+		DELETE FROM SSWEB_USER
+		WHERE CUST_ID = #{CUST_ID}
+	</delete>
+	
+	<insert id="userRoleInsert" parameterType="map" timeout="0">
+		INSERT INTO EBIZ_USER_ROLE(USER_ID, ROLE_CD, REG_DT, REG_USER)
+   		VALUES(#{USER_ID}, #{ROLE_CD}, NOW(), #{IN_USER})
+	</insert>
+	
+	<update id="userRoleUpdate" parameterType="map" timeout="0">
+		UPDATE EBIZ_USER_ROLE
+		SET MOD_DT = NOW()
+			, MOD_USER = #{IN_USER}
+		WHERE USER_ID = #{USER_ID}
+			AND ROLE_CD = #{ROLE_CD}
+	</update>
+	
+	<delete id="userRoleDelete" parameterType="map" timeout="0">
+		DELETE FROM EBIZ_USER_ROLE
+		WHERE 1 = 1
+		<if test="USER_ID != null and USER_ID != '' ">
+		    AND USER_ID = #{USER_ID}
+		</if>	
+		<if test="ROLE_CD != null and ROLE_CD != '' ">
+		    AND ROLE_CD = #{ROLE_CD} 
+		</if>
+	</delete>
+	
+	<!-- Cert History -->
+	<select id="certHistorySelect" parameterType="map" timeout="0" resultType="map" useCache="false">
+		SELECT
+		    LOG_ID,
+		    CERT_NO,
+		    PRT_DATE,
+		    PRT_IP,
+		    CUST_ID
+		FROM EBIZ_CERT_HISTORY
+		WHERE 1 = 1
+		<if test="CUST_ID != null and CUST_ID != '' ">
+			AND CUST_ID LIKE CONCAT('%' , #{CUST_ID} ,'%')
+		</if>
+		<if test="CERT_NO != null and CERT_NO != '' ">
+			AND CERT_NO LIKE CONCAT('%' , #{CERT_NO} ,'%')
+		</if>
+		ORDER BY PRT_DATE DESC
+	</select>
+	
+	<!-- 공지사항 -->
+	<select id="getNoticeList" parameterType="map" resultType="map">
+		SELECT A.*
+		FROM
+		(
+			SELECT
+				SEQ
+				,SUBJECT
+				,CONTENT
+				,USER_ID
+				,DEPT_CD
+				,EMAIL
+				,HIT
+				,REG_DT
+				,MOD_DT
+				,MOD_NM
+			FROM EBIZ_BOARD
+			WHERE 1=1
+				<if test=" SUBJECT != null and SUBJECT != '' ">
+					AND SUBJECT LIKE CONCAT('%' , #{SUBJECT} , '%')
+				</if>
+				<if test=" CONTENT != null and CONTENT != '' ">
+					AND CONTENT LIKE CONCAT('%' , #{CONTENT} , '%')
+				</if>
+				<if test=" MOD_NM != null and MOD_NM != '' ">
+					AND MOD_NM = #{MOD_NM}
+				</if>
+				<if test=" SEQ != null and SEQ != '' ">
+					AND SEQ = #{SEQ}
+				</if>
+			ORDER BY REG_DT DESC
+		) A
+		WHERE 1=1
+		<if test=" NOTI_TOP != null and NOTI_TOP != '' ">
+			AND (@ROWNUM:=0)=0 <![CDATA[<=]]> #{NOTI_TOP}
+		</if>
+	</select>
+
+	<insert id="noticeInsert" parameterType="map">
+		INSERT INTO EBIZ_BOARD
+		(
+			SEQ
+			,SUBJECT
+			,CONTENT
+			,USER_ID
+			,DEPT_CD
+			,EMAIL
+			,HIT
+			,REG_DT			
+			,MOD_NM
+		)
+		VALUES
+		(
+			(select *from (select max(SEQ)+1 from EBIZ_BOARD) next)
+			,#{SUBJECT}
+			,#{CONTENT}
+			,#{USER_ID}
+			,#{DEPT_CD}
+			,#{EMAIL}
+			,0
+			,NOW()			
+			,#{MOD_NM}
+		)	
+	</insert>
+	
+	<update id="noticeUpdate" parameterType="map">
+		UPDATE EBIZ_BOARD
+		SET MOD_DT = NOW()
+			<if test=" SUBJECT != null and SUBJECT != '' ">
+				, SUBJECT = #{SUBJECT}
+			</if>
+			<if test=" CONTENT != null and CONTENT != '' ">
+				, CONTENT = #{CONTENT}
+			</if>
+			<if test=" HIT != null and HIT != '' ">
+				, HIT = #{HIT}
+			</if>
+		WHERE SEQ = #{SEQ}
+	</update>
+	
+	<delete id="noticeDelete" parameterType="map">
+		DELETE FROM EBIZ_BOARD WHERE SEQ = #{SEQ}  
+	</delete>
+</mapper>

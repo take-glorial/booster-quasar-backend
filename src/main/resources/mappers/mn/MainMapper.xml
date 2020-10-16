@@ -1,0 +1,226 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+* 메인 관련
+*
+* @filename mappers/mn/MainMapper.xml
+* @author takeit
+* @since 2020.08.10
+* @version 1.0
+* @see
+*
+* << 변경 이력(Modification Information) >>
+*
+* 변경번호 : #1
+* 변경일자 : 2020.08.10
+* 변경사람 : takeit
+* 변경내용 : 신규 생성
+ -->
+<mapper namespace="Main">
+	<resultMap type="kr.co.takeit.util.TakeMap" id="fileMap">
+        <result column="FILE_BLOB" property="FILE_BLOB" jdbcType="CLOB" javaType="string" />
+    </resultMap>
+
+    <resultMap type="kr.co.takeit.util.TakeMap" id="manualMap">
+        <result column="MANUAL_TXT" property="MANUAL_TXT" jdbcType="CLOB" javaType="string" />
+    </resultMap>
+
+    <resultMap type="kr.co.takeit.util.TakeMap" id="policyMap">
+        <result column="POLICY_INFO" property="POLICY_INFO" jdbcType="CLOB" javaType="string" />
+        <result column="PRIVACY_INFO" property="PRIVACY_INFO" jdbcType="CLOB" javaType="string" />
+    </resultMap>
+
+    <resultMap type="kr.co.takeit.util.TakeMap" id="gridMap">
+        <result column="GRID_FORMAT" property="GRID_FORMAT" jdbcType="CLOB" javaType="string" />
+    </resultMap>
+
+	<!-- user_mymenu_group(사용자마이메뉴그룹) START -->
+	<select id="userMymenuGroupList" parameterType="map" timeout="0" resultType="kr.co.takeit.util.TakeMap" useCache="false">
+		<![CDATA[
+		/*
+		 * Main.userMymenuGroupList
+		 * 사용자마이메뉴그룹 목록
+		 * @author takeit
+		 * @since 2019.08.02
+		 */
+		]]>
+		SELECT
+			PROJECT_CD			-- 프로젝트코드
+			, USER_CD			-- 사용자코드
+			, GROUP_CD			-- 그룹코드
+			, GROUP_NM			-- 그룹명
+			, MEMO_TXT			-- 메모
+			, TO_CHAR(REG_DT, 'YYYY-MM-DD HH24:MI') AS REG_DT	-- 등록일시
+			, REG_CD			-- 등록자코드
+			, TO_CHAR(MOD_DT, 'YYYY-MM-DD HH24:MI') AS MOD_DT	-- 수정일시
+			, MOD_CD			-- 수정자코드
+		FROM USER_MYMENU_GROUP
+		WHERE PROJECT_CD = #{sProjectCd}
+			AND USER_CD = #{_sessionUserCd}
+	</select>
+
+	<insert id="userMymenuGroupInsert" parameterType="map" timeout="0">
+		<![CDATA[
+		/*
+		 * Main.userMymenuGroupInsert
+		 * 사용자마이메뉴그룹 입력
+		 * @author takeit
+		 * @since 2019.08.02
+		 */
+		]]>
+		INSERT INTO USER_MYMENU_GROUP (
+			PROJECT_CD
+			, USER_CD
+			, GROUP_CD
+			, GROUP_NM
+			, MEMO_TXT
+			, REG_DT
+			, REG_CD
+		)
+		VALUES (
+			#{sProjectCd}			-- 프로젝트코드
+			, #{_sessionUserCd}		-- 사용자코드(세션)
+			, 'G0001'			-- 그룹코드
+			, #{group_nm}			-- 그룹명
+			, #{memo_txt}			-- 메모
+			, SYSDATE					-- 등록일시
+			, #{_sessionUserCd}		-- 등록자코드(세션)
+		)
+	</insert>
+
+	<update id="userMymenuGroupUpdate" parameterType="map" timeout="0">
+		<![CDATA[
+		/*
+		 * Main.userMymenuGroupUpdate
+		 * 사용자마이메뉴그룹 수정
+		 * @author takeit
+		 * @since 2019.08.02
+		 */
+		]]>
+		UPDATE USER_MYMENU_GROUP
+		SET
+			GROUP_NM = #{group_nm}			-- 그룹명
+			, MEMO_TXT = #{memo_txt}		-- 메모
+			, MOD_DT = SYSDATE				-- 수정일시
+			, MOD_CD = #{_sessionUserCd}	-- 수정자코드(세션)
+		WHERE PROJECT_CD = #{sProjectCd}	-- 프로젝트코드
+			AND USER_CD = #{_sessionUserCd}	-- 사용자코드(세션)
+			AND GROUP_CD = 'G0001'		-- 그룹코드
+	</update>
+
+	<delete id="userMymenuGroupDelete" parameterType="map" timeout="0">
+		<![CDATA[
+		/*
+		 * Main.userMymenuGroupDelete
+		 * 사용자마이메뉴그룹 삭제
+		 * @author takeit
+		 * @since 2019.08.02
+		 */
+		]]>
+		DELETE FROM USER_MYMENU_GROUP
+		WHERE PROJECT_CD = #{sProjectCd}		-- 프로젝트코드
+			AND USER_CD = #{_sessionUserCd}		-- 사용자코드(세션)
+			AND GROUP_CD = 'G0001'			-- 그룹코드
+	</delete>
+	<!-- user_mymenu_group(사용자마이메뉴그룹) END -->
+
+	<!-- user_mymenu(사용자마이메뉴) START -->
+	<select id="userMymenuList" parameterType="map" timeout="0" resultType="kr.co.takeit.util.TakeMap" useCache="false">
+		<![CDATA[
+		/*
+		 * Main.userMymenuList
+		 * 사용자마이메뉴 목록
+		 * @author takeit
+		 * @since 2019.08.02
+		 */
+		]]>
+			SELECT UM.MENU_CD
+				, PM.DEVICE_TYPE				-- 디바이스 유형
+				, PM.ROOT_MENU					-- ROOT메뉴
+				, PM.PARENT_MENU				-- 부모 메뉴코드
+				, PM.MENU_LEVEL					-- 메뉴LEVEL
+				, PM.MENU_NM					-- 메뉴명
+				, PM.MENU_TYPE					-- 메뉴유형
+				, P.PROGRAM_ID AS MENU_URL		-- 메뉴URL(*.XFDL)
+				, PM.MENU_ORDER					-- 정렬순서
+				, PM.DISPLAY_YN					-- 메뉴표시여부
+				, PM.DESC_TXT					-- 상세설명
+				, P.PROGRAM_PREFIX 				-- 메뉴PREFIX
+				, PM.MENU_PARAM					-- 메뉴파라미터
+				, '' AS MENU_ICON
+				, 'Y' AS MYMENU_YN
+			FROM USER_MYMENU UM
+				INNER JOIN USER_MYMENU_GROUP UMG ON UM.PROJECT_CD = UMG.PROJECT_CD AND UM.USER_CD = UMG.USER_CD AND UM.GROUP_CD = UMG.GROUP_CD
+				INNER JOIN PROJECT_MENU PM ON UM.PROJECT_CD = PM.PROJECT_CD AND UM.MENU_CD = PM.MENU_CD
+				INNER JOIN PROGRAM_INFO P ON PM.PROGRAM_CD = P.PROGRAM_CD
+				LEFT OUTER JOIN CODE_INFO C ON C.GROUP_ID = '00006' AND P.PROGRAM_PREFIX = C.CODE_ID
+			WHERE UM.PROJECT_CD = #{sProjectCd}
+				AND UM.USER_CD = #{_sessionUserCd}
+	</select>
+
+	<insert id="userMymenuInsert" parameterType="map" timeout="0">
+		<![CDATA[
+		/*
+		 * Main.userMymenuInsert
+		 * 사용자마이메뉴 입력
+		 * @author takeit
+		 * @since 2019.08.02
+		 */
+		]]>
+		INSERT INTO USER_MYMENU (
+			PROJECT_CD
+			, USER_CD
+			, GROUP_CD
+			, MENU_CD
+			, REG_DT
+			, REG_CD
+		)
+		VALUES (
+			#{sProjectCd}			-- 프로젝트코드
+			, #{_sessionUserCd}		-- 사용자코드
+			, 'G0001'			-- 그룹코드
+			, #{menu_cd}			-- 메뉴코드
+			, SYSDATE					-- 등록일시
+			, #{_sessionUserCd}		-- 등록자코드
+		)
+	</insert>
+
+	<update id="userMymenuUpdate" parameterType="map" timeout="0">
+		<![CDATA[
+		/*
+		 * Main.userMymenuUpdate
+		 * 사용자마이메뉴 수정
+		 * @author takeit
+		 * @since 2019.08.02
+		 */
+		]]>
+		UPDATE USER_MYMENU
+		SET
+			GROUP_CD = 'G0001'			-- 그룹코드
+			, MENU_CD = #{menu_cd}			-- 메뉴코드
+			, MOD_DT = SYSDATE				-- 수정일시
+			, MOD_CD = #{_sessionUserCd}	-- 수정자코드
+		WHERE PROJECT_CD = #{sProjectCd}	-- 프로젝트코드
+			AND USER_CD = #{_sessionUserCd}	-- 사용자코드
+	</update>
+
+	<delete id="userMymenuDelete" parameterType="map" timeout="0">
+		<![CDATA[
+		/*
+		 * Main.userMymenuDelete
+		 * 사용자마이메뉴 삭제
+		 * @author takeit
+		 * @since 2019.08.02
+		 */
+		]]>
+		DELETE FROM USER_MYMENU
+		WHERE PROJECT_CD = #{sProjectCd}		-- 프로젝트코드
+			AND USER_CD = #{_sessionUserCd}		-- 사용자코드
+			AND GROUP_CD = 'G0001'			-- 그룹코드
+			AND MENU_CD = #{menu_cd}			-- 메뉴코드
+	</delete>
+	<!-- user_mymenu(사용자마이메뉴) END -->
+
+</mapper>

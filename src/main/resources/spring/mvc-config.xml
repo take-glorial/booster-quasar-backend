@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- DispatcherServlet application context for Application's web tier. -->
+<beans xmlns="http://www.springframework.org/schema/beans"
+    xmlns:aop="http://www.springframework.org/schema/aop"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:p="http://www.springframework.org/schema/p"
+    xmlns:context="http://www.springframework.org/schema/context"
+    xmlns:mvc="http://www.springframework.org/schema/mvc"
+    xmlns:cache="http://www.springframework.org/schema/cache"
+    xmlns:task="http://www.springframework.org/schema/task"
+    xmlns:tx="http://www.springframework.org/schema/tx"
+    xsi:schemaLocation="
+        http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+        http://www.springframework.org/schema/aop http://www.springframework.org/schema/aop/spring-aop.xsd
+        http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context.xsd
+        http://www.springframework.org/schema/mvc http://www.springframework.org/schema/mvc/spring-mvc.xsd
+        http://www.springframework.org/schema/cache http://www.springframework.org/schema/cache/spring-cache.xsd
+        http://www.springframework.org/schema/task http://www.springframework.org/schema/task/spring-task.xsd
+        http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx-4.0.xsd">
+
+    <!-- ============================================================= -->
+    <!-- Excel -->
+    <!-- ============================================================= -->
+    <mvc:resources location="/export/" mapping="/export/**"/>
+
+    <!-- ============================================================= -->
+    <!-- AOP -->
+    <!-- ============================================================= -->
+    <aop:aspectj-autoproxy proxy-target-class="true"/>
+    <mvc:annotation-driven />
+
+    <!-- ============================================================= -->
+    <!-- Component Scan -->
+    <!-- The controllers are autodetected POJOs labeled with the @Controller annotation. -->
+    <!-- ============================================================= -->
+    <context:component-scan base-package="kr.co.takeit,kr.co.company" use-default-filters="false">
+        <context:include-filter type="annotation" expression="org.springframework.stereotype.Controller"/>
+    </context:component-scan>
+
+    <!-- Project Configuration -->
+    <bean id="takePropertyPlaceholderConfigurer" class="kr.co.takeit.spring.config.TakePropertyPlaceholderConfigurer">
+        <constructor-arg ref="propertyConfigurer" />
+    </bean>
+
+	<!-- cross origin -->
+	<mvc:cors>
+	    <mvc:mapping path="/**"
+	        allowed-origins="*"
+	        allowed-headers="Content-Type, Access-Control-Allow-Origin, Access-Control-Allow-Headers, Authorization, X-Requested-With, requestId, Correlation-Id"
+	        allowed-methods="GET, PUT, POST, DELETE, OPTIONS"/>
+	</mvc:cors>
+
+    <!-- ============================================================= -->
+    <!-- Interceptor -->
+    <!-- ============================================================= -->
+	<mvc:interceptors>
+		 <mvc:interceptor>
+		 	<mvc:mapping path="/**"/>
+		 	<mvc:exclude-mapping path="/login.do"/>
+		 	<mvc:exclude-mapping path="/logout.do"/>
+		 	<mvc:exclude-mapping path="/mn/dupCheck.do"/>
+		 	<mvc:exclude-mapping path="/mn/userPwUpdate.do"/>
+		 	<mvc:exclude-mapping path="/mn/userJoin.do"/>
+
+		 	<mvc:exclude-mapping path="/emailTest.do"/>
+
+		 	<bean class="kr.co.takeit.web.SessionInterceptor"></bean>
+		 </mvc:interceptor>
+	</mvc:interceptors>
+
+    <!-- ============================================================= -->
+    <!-- JSON Converter -->
+    <!-- ============================================================= -->
+	<mvc:annotation-driven>
+		<mvc:message-converters>
+			<bean class="org.springframework.http.converter.json.MappingJackson2HttpMessageConverter"/>
+		</mvc:message-converters>
+	</mvc:annotation-driven>
+
+    <!-- ============================================================= -->
+    <!-- RequestMapping -->
+    <!-- ============================================================= -->
+	<bean id="requestMapping" class="org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping" />
+	<bean class="org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter"/>
+    <bean id="urlFilenameViewController" class="org.springframework.web.servlet.mvc.UrlFilenameViewController"/>
+
+
+    <!-- ============================================================= -->
+    <!-- Resolver -->
+    <!-- ============================================================= -->
+    <bean id="localeResolver" class="org.springframework.web.servlet.i18n.SessionLocaleResolver" />
+	<bean class="org.springframework.web.servlet.view.InternalResourceViewResolver">
+        <!-- Example: a logical view name of 'showMessage' is mapped to '/WEB-INF/jsp/showMessage.jsp' -->
+        <property name="prefix" value="/WEB-INF/view/"/>
+        <property name="suffix" value=".jsp"/>
+	</bean>
+
+    <!-- Multipart Resolver : 최대 10메가 바이트(정확히 10메가는 아니지만)까지 업로드가 가능하도록 설정  -->
+    <bean id="multipartResolver" class="org.springframework.web.multipart.commons.CommonsMultipartResolver">
+        <property name="maxUploadSize" value="100000000" />
+        <property name="maxInMemorySize" value="100000000" />
+    </bean>
+</beans>

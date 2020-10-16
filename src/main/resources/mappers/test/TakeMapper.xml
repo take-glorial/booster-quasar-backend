@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="kr.co.takeit.mapper.TakeMapper">
+
+	<!-- Left Tree Table -->
+	<select id="selectTable" parameterType="map" timeout="0" resultType="map" useCache="false">
+	
+		with recursive cte (OBJ_PARENT, OBJ_NAME, OBJ_DEPTH, PATH) as
+		(
+			SELECT CAST(0 AS char(100)) AS OBJ_PARENT, TABLE_NAME AS OBJ_NAME, '0' AS OBJ_DEPTH, TABLE_NAME as PATH
+			FROM INFORMATION_SCHEMA.TABLES 
+			WHERE TABLE_SCHEMA = 'test'
+			union all 
+			SELECT a.TABLE_NAME AS OBJ_PARENT, CONCAT(a.COLUMN_NAME,' ', a.COLUMN_TYPE) AS OBJ_NAME, '1' AS OBJ_DEPTH, CONCAT(cte.PATH, ',', a.TABLE_NAME) AS PATH
+			from INFORMATION_SCHEMA.columns AS a
+				inner join cte
+				     on a.TABLE_NAME = cte.OBJ_NAME
+			where table_schema='test'
+		)
+		select * from cte
+		WHERE 1=1
+			<if test="sTableNm != null and sTableNm != '' ">
+   				AND OBJ_NAME LIKE CONCAT('%', #{sTableNm}, '%')
+  				OR PATH LIKE CONCAT('%', #{sTableNm}, '%')
+			</if>
+		order by path
+		
+	</select>
+	
+	<!-- Quarry Action -->
+	<select id="selectQuarry" parameterType="map" timeout="0" resultType="map" useCache="false">
+
+		<if test="sContents != null and sContents != '' ">
+  				${sContents}
+		</if>
+			
+	</select>
+</mapper>
